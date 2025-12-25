@@ -1,0 +1,30 @@
+{
+    "voice": "en-US-AnaNeural",
+    "voice_list": {
+        "1": {
+            "id": "en-US-AnaNeural",
+            "name": "Ana (Female, Cute)"
+        },
+        "2": {
+            "id": "en-US-ChristopherNeural",
+            "name": "Christopher (Male, Mature)"
+        },
+        "3": {
+            "id": "en-US-AriaNeural",
+            "name": "Aria (Female, Professional)"
+        },
+        "4": {
+            "id": "en-US-GuyNeural",
+            "name": "Guy (Male, Professional)"
+        },
+        "5": {
+            "id": "en-US-JennyNeural",
+            "name": "Jenny (Female, Soft)"
+        },
+        "6": {
+            "id": "en-US-EricNeural",
+            "name": "Eric (Male, Assertive)"
+        }
+    },
+    "require_wake_word": false
+}
