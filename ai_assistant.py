@@ -3,6 +3,7 @@ import os
 import time
 import datetime
 import re
+
 try:
     import noisereduce as nr
 except ImportError:
@@ -11,6 +12,18 @@ except ImportError:
 except Exception as e:
     nr = None
     print(f"Warning: noisereduce import error: {e}")
+
+try:
+    import pyautogui
+except ImportError:
+    print("Warning: pyautogui not installed. System control disabled.")
+    pyautogui = None
+
+try:
+    import psutil
+except ImportError:
+    print("Warning: psutil not installed. System monitoring disabled.")
+    psutil = None
 
 import numpy as np
 import io
@@ -27,6 +40,13 @@ import requests
 import json
 import dateparser
 from duckduckgo_search import DDGS
+import shutil
+import glob
+try:
+    import vision_utils
+except:
+    vision_utils = None
+    print("Warning: vision_utils not found (or cv2 issue). Vision disabled.")
 
 # Initialize TTS engine
 # Global engine removed to prevent threading issues
@@ -277,6 +297,151 @@ def chat(text):
         
     else:
         speak("I heard you, but I'm not sure how to reply to that specific thing yet.")
+
+def organize_files():
+    """Organizes the Downloads folder."""
+    downloads_path = os.path.join(os.path.expanduser("~"), "Downloads")
+    if not os.path.exists(downloads_path):
+        speak("I couldn't find your Downloads folder.")
+        return
+
+    file_types = {
+        "Images": [".jpg", ".jpeg", ".png", ".gif", ".bmp"],
+        "Documents": [".pdf", ".docx", ".txt", ".xlsx", ".pptx"],
+        "Installers": [".exe", ".msi"],
+        "Archives": [".zip", ".rar", ".7z"],
+        "Videos": [".mp4", ".mkv", ".avi"]
+    }
+    
+    count = 0
+    for file in os.listdir(downloads_path):
+        file_path = os.path.join(downloads_path, file)
+        if os.path.isfile(file_path):
+            ext = os.path.splitext(file)[1].lower()
+            for folder, extensions in file_types.items():
+                if ext in extensions:
+                    target_folder = os.path.join(downloads_path, folder)
+                    try:
+                        os.makedirs(target_folder, exist_ok=True)
+                        shutil.move(file_path, os.path.join(target_folder, file))
+                        count += 1
+                    except:
+                        pass
+                    break
+    
+    speak(f"I have organized {count} files in your Downloads folder.")
+
+def clean_temp_files():
+    """Cleans Windows temp files."""
+    temp_path = os.getenv('TEMP')
+    if not temp_path:
+        speak("I couldn't locate the temp folder.")
+        return
+        
+    count = 0
+    # Walk and delete
+    for root, dirs, files in os.walk(temp_path):
+        for f in files:
+            try:
+                os.remove(os.path.join(root, f))
+                count += 1
+            except:
+                pass
+    speak(f"I have deleted {count} temporary junk files. Your system should be faster now.")
+
+def see_environment():
+    """Captures a frame and analyzes it."""
+    # We need to access the camera. Since setup.py has the camera open, 
+    # we can't open it again easily without conflict unless we use the shared queue architecture.
+    # However, for simplicity in this script (which runs as a module in setup.py),
+    # we can't easily access the frame *here* if setup.py is calling functions *here*.
+    # WAIT! setup.py calls `process_command`.
+    # We can ask setup.py to pass the frame? No, `process_command` signature is fixed.
+    # ALTERNATIVE: Use a snapshot file. setup.py saves 'latest_frame.jpg' constantly?
+    # BETTER: Just re-open camera quickly? No, it will fail if setup.py holds it.
+    
+    # SOLUTION: Use the 'screenshot' we just implemented? 
+    # taking a screenshot sees the SCREEN, not the WORLD.
+    
+    # We will try to open a NEW VideoCapture. Most webcams support multiple inputs OR fail.
+    # If it fails, we assume setup.py is running and we might need a different architectural approach.
+    # For now, let's try to capture 1 frame.
+    
+    if not vision_utils:
+        speak("My vision processing is disabled.")
+        return
+
+    cam = cv2.VideoCapture(0)
+    ret, frame = cam.read()
+    cam.release()
+    
+    if ret:
+        objects = vision_utils.detect_objects_in_frame(frame)
+        if objects:
+            item_list = ", ".join(objects)
+            speak(f"I can see: {item_list}")
+        else:
+            speak("I don't see any familiar objects.")
+    else:
+        speak("I couldn't access the camera to see.")
+
+def system_control(command):
+    if not pyautogui:
+        speak("I don't have control over the system.")
+        return
+
+    if "screenshot" in command:
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"screenshot_{timestamp}.png"
+        pyautogui.screenshot(filename)
+        speak(f"Screenshot taken and saved as {filename}")
+    
+    elif "volume up" in command:
+        pyautogui.press("volumeup", presses=5)
+        speak("Volume increased.")
+    
+    elif "volume down" in command:
+        pyautogui.press("volumedown", presses=5)
+        speak("Volume decreased.")
+        
+    elif "mute" in command:
+        pyautogui.press("volumemute")
+        speak("System muted.")
+
+def get_system_status():
+    if not psutil:
+        return "I cannot check system status."
+    
+    cpu = psutil.cpu_percent(interval=1)
+    memory = psutil.virtual_memory().percent
+    battery = psutil.sensors_battery()
+    
+    status = f"CPU usage is at {cpu} percent. Memory usage is at {memory} percent."
+    if battery:
+        status += f" Battery is at {battery.percent} percent."
+        if battery.power_plugged:
+             status += " and charging."
+    return status
+
+def get_weather(city=""):
+    # If no city provided, try to guess from IP
+    if not city:
+        loc_str = get_location() # "City, Region, Country"
+        if loc_str:
+            city = loc_str.split(",")[0]
+        else:
+            return "I need to know which city to check for."
+            
+    try:
+        # Using wttr.in for simple text based weather
+        url = f"https://wttr.in/{city}?format=%C+%t"
+        response = requests.get(url)
+        if response.status_code == 200:
+            return f"The weather in {city} is {response.text.strip()}"
+        else:
+             return "I couldn't fetch the weather."
+    except:
+        return "Weather service is unreachable."
 
 def get_public_ip():
     """Fetches the public IP address of the network."""
@@ -738,12 +903,45 @@ def process_command(command):
         return "continue"
     
     # --- 6. Location & Reminders ---
+    if "organize" in command and "downloads" in command:
+        organize_files()
+        return "continue"
+    
+    if "clean" in command and "temp" in command:
+        clean_temp_files()
+        return "continue"
+
+    if "what do you see" in command or "look at this" in command or "identify" in command:
+        # NOTE: This might crash if camera is busy by setup.py
+        # Ideally setup.py should handle this, but we put logic here.
+        # Let's try.
+        import cv2 # Late import
+        see_environment()
+        return "continue"
+
     if "where am i" in command or "my location" in command:
         loc = get_location()
         if loc:
             speak(f"You are currently in {loc}")
         else:
             speak("I couldn't determine your location.")
+        return "continue"
+
+    if "weather" in command:
+        # Extract city if possible e.g. "weather in London"
+        city = ""
+        if "in" in command:
+            city = command.split("in")[-1].strip()
+        
+        speak(get_weather(city))
+        return "continue"
+
+    if "system status" in command or "cpu" in command or "battery" in command:
+        speak(get_system_status())
+        return "continue"
+
+    if "screenshot" in command or "volume" in command or "mute" in command:
+        system_control(command)
         return "continue"
 
     if "remind me" in command or "set a reminder" in command:

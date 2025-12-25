@@ -1,65 +1,53 @@
-# AI Assistant User Guide
+# J.A.R.V.I.S. AI Assistant - "The Upgrade"
 
-Welcome to your new AI Assistant! This guide will help you understand how to operate her and use all her features.
+Welcome to your advanced AI Assistant! This system has been upgraded with **Sentry Security**, **Emotion Intelligence**, **Computer Vision**, and **Desktop Automation**.
 
 ## 🚀 How to Start
-1.  Open your terminal/command prompt.
-2.  Navigate to the project folder.
-3.  Run the setup script:
+1.  **Run the System**:
     ```bash
     python setup.py
     ```
-4.  The system will start. You will see a camera window ensuring it recognizes you.
+2.  **The HUD**: You will see a Sci-Fi "Head-Up Display" with live system stats (CPU/RAM/Battery) and face tracking.
 
-## 🗣️ Interacting with Her
-She listens for specific **Wake Words** or if you are in an active conversation.
+## 🛡️ Sentry Mode (Security)
+Your assistant protects your PC when you are away.
+-   **Trigger**: If an **UNKNOWN** face is detected for more than 5 seconds.
+-   **Reaction**: 
+    -   HUD flashes **RED**.
+    -   "INTRUDER DETECTED" warning appears.
+    -   (Future: Takes a photo / Plays alarm).
 
-**Wake Words:**
-- "Jarvis" (Primary)
-- "Hey Jarvis", "Travis", "Mavis" (She is lenient with messy recognition!)
+## 🧠 Smart Features (New!)
 
-**Barge-in:**
-- She is interruptible! If she is talking too much, just speak loudly over her (e.g., "Jarvis, STOP!"). She will pause and listen to you.
+### 1. Emotion & Personality
+She adapts to *YOU*.
+-   **Emotion Detection**: The HUD displays your current emotion (Happy, Sad, Angry, Neutral).
+-   **Reaction**: She changes her tone and the HUD colors change to match your mood (Yellow=Happy, Grey=Sad).
 
-## 🛠️ Features & Commands
+### 2. Computer Vision ("The Eyes")
+She can see the real world, not just faces.
+-   **Say**: *"What do you see?"*
+-   **Say**: *"Look at this."*
+-   **Result**: She will list objects in front of the camera (e.g., "I see a person, a cell phone, and a bottle").
 
-### 1. Conversation & Personality
-She has a "cute real human girl" personality. She laughs, sighs, and giggles!
-- **Say:** "Hello", "How are you?", "You are cute."
-- **she responds:** With emotions like "Hahaha!", "Aww thanks!", etc.
+### 3. Desktop Automation ("The Secretary")
+She keeps your PC organized.
+-   **Say**: *"Organize downloads"* -> Sorts files in Downloads into folders (Images, Documents, Installers, etc.).
+-   **Say**: *"Clean temp files"* -> Deletes safe-to-remove Windows temporary junk to speed up your PC.
 
-### 2. Web Search & Knowledge
-She can search the web for anything.
-- **Say:** "Search web for current stock market trends."
-- **Say:** "Search online for ranking of comsats."
-    - *Note:* You don't need to say "I want you to...", just say what you want!
-- **Say:** "Who is Elon Musk?" (Wikipedia lookup)
-- **Say:** "Current events" (Gets latest news).
+### 4. System Control
+Total control over your machine.
+-   **Say**: *"Take a screenshot"* (Saves to folder).
+-   **Say**: *"Volume up / Volume down / Mute"*.
+-   **Say**: *"System status"* (Reads out CPU, Memory, and Battery levels).
+-   **Say**: *"What is the weather?"* or *"Weather in [City]"*.
 
-### 3. Location
-She knows where you are based on your IP address.
-- **Say:** "Where am I?"
-- **Say:** "My location."
+## 🗣️ Core Features
+*   **Conversation**: "Hello", "How are you?", "Who is Elon Musk?"
+*   **Reminders**: "Remind me to call mom in 10 minutes."
+*   **Apps**: "Open Chrome", "Open Spotify".
+*   **Web Search**: "Search for latest tech news."
 
-### 4. Reminders
-She can remember things for you.
-- **Say:** "Remind me to take out the trash in 5 minutes."
-- **Say:** "Set a reminder for January 1st to call mom."
-- **Say:** "Remind me to check the oven at 5 PM."
-- *She checks for these automatically in the background and will speak up when it's time!*
-
-### 5. App Control
-She can open applications on your computer.
-- **Say:** "Open Notepad."
-- **Say:** "Open Chrome."
-- **Say:** "Open Google." (Opens Google in browser)
-
-### 6. System
-- **Say:** "My IP" or "My internet address."
-- **Say:** "Time" or "Date."
-- **Say:** "Exit" or "Stop" to close the assistant.
-- **Say:** "Code 999" (Goes to sleep mode).
-
-## 💡 Pro Tips
-- **Microphone:** Use a good microphone or headphones for the best "Barge-in" experience.
-- **Recognition:** If she doesn't hear you, try speaking clearer or waiting for the "Listening..." status on the screen.
+## 🔧 Troubleshooting
+*   **Vision**: If "What do you see" fails, ensure `vision_utils.py` and the `MobileNet` models are in the folder.
+*   **Audio**: If she is interrupting herself, adjust the microphone sensitivity or use headphones (Barge-in feature).
