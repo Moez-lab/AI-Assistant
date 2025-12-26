@@ -61,16 +61,7 @@ def face_recognition_worker():
                     path_parts = identity_path.split('/')
                     name = path_parts[-2] if len(path_parts) >= 2 else path_parts[-1].split('.')[0]
             
-            # Push result to main thread
-            if not result_queue.full():
-                result_queue.put((name, distance))
-            else:
-                try:
-                    result_queue.get_nowait()
-                except:
-                    pass
-            
-            # Push extended result
+            # Push result to main thread with Extended Emotion data
             if not result_queue.full():
                 result_queue.put((name, distance, emotion))
                     
@@ -152,6 +143,9 @@ while True:
     except queue.Empty:
         pass # No new result yet, keep using old one
         
+    # Update Assistant Emotion State
+    ai_assistant.update_emotion(emotion)
+
     frame_count += 1
 
     # Check for reminders periodically (e.g. every 100 frames ~ 3-5 seconds depending on fps)
@@ -172,31 +166,41 @@ while True:
     
     height, width, _ = frame.shape
     
+    # Emotion coloring
+    if emotion == "happy":
+        emotion_color = (0, 255, 255) # Yellow
+    elif emotion == "sad":
+        emotion_color = (128, 128, 128) # Grey
+    elif emotion == "angry":
+        emotion_color = (0, 0, 255) # Red
+    else:
+        emotion_color = (255, 0, 0) # Blue (Neutral default in BGR is Blue-ish? OpenCV uses BGR. Blue is 255,0,0)
+
     # Draw Corner Brackets (Futuristic Look)
     d = 40 # length of bracket line
     t = 2 # thickness
     
     # Top Left
-    cv2.line(frame, (20, 20), (20+d, 20), CYAN, t)
-    cv2.line(frame, (20, 20), (20, 20+d), CYAN, t)
+    cv2.line(frame, (20, 20), (20+d, 20), emotion_color, t)
+    cv2.line(frame, (20, 20), (20, 20+d), emotion_color, t)
     
     # Top Right
-    cv2.line(frame, (width-20, 20), (width-20-d, 20), CYAN, t)
-    cv2.line(frame, (width-20, 20), (width-20, 20+d), CYAN, t)
+    cv2.line(frame, (width-20, 20), (width-20-d, 20), emotion_color, t)
+    cv2.line(frame, (width-20, 20), (width-20, 20+d), emotion_color, t)
     
     # Bottom Left
-    cv2.line(frame, (20, height-20), (20+d, height-20), CYAN, t)
-    cv2.line(frame, (20, height-20), (20, height-20-d), CYAN, t)
+    cv2.line(frame, (20, height-20), (20+d, height-20), emotion_color, t)
+    cv2.line(frame, (20, height-20), (20, height-20-d), emotion_color, t)
     
     # Bottom Right
-    cv2.line(frame, (width-20, height-20), (width-20-d, height-20), CYAN, t)
-    cv2.line(frame, (width-20, height-20), (width-20, height-20-d), CYAN, t)
+    cv2.line(frame, (width-20, height-20), (width-20-d, height-20), emotion_color, t)
+    cv2.line(frame, (width-20, height-20), (width-20, height-20-d), emotion_color, t)
     
     # Identification Box
     if last_name not in ["Unknown", "Scanning..."]:
         # Recognized - Green Box
         box_color = Green 
-        label = f"ID: {last_name.upper()} [{last_distance:.2f}]"
+        display_text = f"ID: {last_name.upper()} [{last_distance:.2f}]"
     elif last_name == "Unknown":
         # Intruder - Red Box
         box_color = Red
@@ -215,15 +219,8 @@ while True:
             # Play beep (simple print, actually playing sound needs library like winsound or pygame)
             # winsound.Beep(1000, 200) # Blocking, be careful.
             
-    # Emotion coloring
-    if emotion == "happy":
-        emotion_color = (0, 255, 255) # Yellow
-    elif emotion == "sad":
-        emotion_color = (128, 128, 128) # Grey
-    elif emotion == "angry":
-        emotion_color = (0, 0, 255) # Red
-    else:
-        emotion_color = (255, 0, 0) # Blue
+    # Emotion Coloring Logic Moved Up
+    # (Removed duplicate block)
         
     cv2.putText(frame, display_text, (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, emotion_color, 2)
     

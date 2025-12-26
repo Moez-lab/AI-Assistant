@@ -108,6 +108,28 @@ except:
 import queue
 import threading
 import sys
+from collections import deque
+import random
+
+# --- Emotion State ---
+emotion_queue = deque(maxlen=10) # Store last 10 emotions for smoothing
+current_emotion = "Neutral"
+
+def update_emotion(new_emotion):
+    """Updates the internal emotion state with smoothing."""
+    global current_emotion
+    emotion_queue.append(new_emotion)
+    
+    # Find dominant emotion in recent history
+    try:
+        if len(emotion_queue) > 0:
+            # Simple majority vote
+            from collections import Counter
+            counts = Counter(emotion_queue)
+            dominant = counts.most_common(1)[0][0]
+            current_emotion = dominant.lower()
+    except:
+        pass
 
 # ... (Previous imports exist above, we are just ensuring we have what we need)
 
@@ -229,19 +251,28 @@ def speak(text):
     if not text: return
     print(f"Assistant: {text}")
     
+    # --- Emotion Adaptation (Speech) ---
+    # If Angry, be short and apologetic.
+    if current_emotion == "angry":
+        # Check if text is long, if so, summarize or apologize
+        if len(text) > 50:
+             text = "I am sorry. I will try to do better."
+        else:
+             text = "I understand. " + text
+
     # --- Action Mapping for Cuteness (Preprocessing) ---
     replacements = {
-        r'[\(\*]+(laughs|laughter|laughing|chuckles|giggles|rofl|lol)[\)\*]+': ' Hahaha! ',
-        r'[\(\*]+(sighs|sighing)[\)\*]+': ' Hhh... ',
-        r'[\(\*]+(clears throat|ahem)[\)\*]+': ' Ahem. ',
-        r'[\(\*]+(gasps|gasp)[\)\*]+': ' (gasp) ',
-        r'[\(\*]+(yawn|yawns)[\)\*]+': ' Yaaawn... ',
-        r'[\(\*]+(cries|sobs|sniffles)[\)\*]+': ' Huhu... ',
-        r'[\(\*]+(hums|humming)[\)\*]+': ' Hmm hmm hmm. ',
-        r'[\(\*]+(screams|shouts)[\)\*]+': ' Ahhh! ',
-        r'[\(\*]+(smirk|smirks|smirking)[\)\*]+': ' Heh. ',
-        r'[\(\*]+(blushes|shy|acting shy)[\)\*]+': ' Umm... ',
-        r'[\(\*]+(pauses|thinking|thinks)[\)\*]+': ' Hmm... ',
+        r'[\(\*]+(laughs|laughter|laughing|chuckles|giggles|rofl|lol)[\)\*]+': ' Haha! ',
+        r'[\(\*]+(sighs|sighing)[\)\*]+': ' hh... ',
+        r'[\(\*]+(clears throat|ahem)[\)\*]+': ' mm-hm ',
+        r'[\(\*]+(gasps|gasp)[\)\*]+': ' oh! ',
+        r'[\(\*]+(yawn|yawns)[\)\*]+': ' yawn... ',
+        r'[\(\*]+(cries|sobs|sniffles)[\)\*]+': ' snff... ',
+        r'[\(\*]+(hums|humming)[\)\*]+': ' hmm hmm ',
+        r'[\(\*]+(screams|shouts)[\)\*]+': ' ah! ',
+        r'[\(\*]+(smirk|smirks|smirking)[\)\*]+': ' heh. ',
+        r'[\(\*]+(blushes|shy|acting shy)[\)\*]+': ' um... ',
+        r'[\(\*]+(pauses|thinking|thinks)[\)\*]+': ' hmm... ',
         r'[\(\*]+(winks|nods|shrugs|smiles|frowns|looks|points|waves|stares|leans|bounces|beams)[\)\*]+': '', # Silent actions
     }
 
@@ -812,6 +843,16 @@ def process_command(command):
         # User just wanted to barge-in/silence. 
         # Speech already stopped by listen_loop.
         # Just ack or do nothing.
+        return "continue"
+
+    # --- 1.5 Emotion-Based Music & Actions ---
+    if "play music" in command or "play songs" in command:
+        if current_emotion == "sad":
+             speak("I see you are feeling down. Playing something to match your mood.")
+             webbrowser.open("https://www.youtube.com/watch?v=hLQl3WQQoQ0") # Sad song (Adele - Someone Like You example)
+        else:
+             speak("Playing some upbeat music for you!")
+             webbrowser.open("https://www.youtube.com/watch?v=09R8_2nJtjg") # Happy/Upbeat (Sugar - Maroon 5 example)
         return "continue"
         
     # --- 2. Dynamic App Opening ---
