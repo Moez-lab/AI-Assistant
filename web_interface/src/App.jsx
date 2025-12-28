@@ -49,11 +49,11 @@ function App() {
         {/* Left Side: Stats */}
         <div className="hud-stats">
           {/* <div className="stat-row"><span className="arrow">▶</span> <span className="label">Height</span> <span className="value">168 CM</span></div> */}
-          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Body Type</span> <span className="value">SLENDER</span></div>
-          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Face Type</span> <span className="value">CLASSIC</span></div>
-          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Skin Tone</span> <span className="value">OLIVE</span></div>
-          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Eye Color</span> <span className="value">BROWN</span></div>
-          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Lip Color</span> <span className="value">NEUTRAL</span></div>
+          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Body Type</span> <span className="value">METALIC</span></div>
+          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Face Type</span> <span className="value">ROBOT</span></div>
+          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Skin Tone</span> <span className="value">GREY</span></div>
+          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Eye Color</span> <span className="value">WHITE</span></div>
+          <div className="stat-row"><span className="arrow">▶</span> <span className="label">Lip Color</span> <span className="value">GREY</span></div>
           <div className="stat-row"><span className="arrow">▶</span> <span className="label">Language</span> <span className="value">ENGLISH</span></div>
         </div>
 
