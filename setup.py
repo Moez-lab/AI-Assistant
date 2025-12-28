@@ -6,6 +6,7 @@ import queue
 import cv2
 from deepface import DeepFace
 import ai_assistant
+import shared_state  # Shared state for YOLO
 
 # Force output to UTF-8
 sys.stdout.reconfigure(encoding='utf-8')
@@ -110,6 +111,9 @@ emotion = "Neutral"
 while True:
     ret, frame = cap.read()
     if not ret: break
+    
+    # Store latest frame for YOLO access
+    shared_state.latest_frame = frame.copy()
     
     # 1. Send frame to Brain Thread (Non-blocking)
     if frame_count % 5 == 0: # Check face every 5 frames

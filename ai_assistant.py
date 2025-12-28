@@ -441,42 +441,41 @@ def clean_temp_files():
     speak(f"I have deleted {count} temporary junk files. Your system should be faster now.")
 
 def see_environment():
-    """Captures a frame and analyzes it."""
-    # We need to access the camera. Since setup.py has the camera open, 
-    # we can't open it again easily without conflict unless we use the shared queue architecture.
-    # However, for simplicity in this script (which runs as a module in setup.py),
-    # we can't easily access the frame *here* if setup.py is calling functions *here*.
-    # WAIT! setup.py calls `process_command`.
-    # We can ask setup.py to pass the frame? No, `process_command` signature is fixed.
-    # ALTERNATIVE: Use a snapshot file. setup.py saves 'latest_frame.jpg' constantly?
-    # BETTER: Just re-open camera quickly? No, it will fail if setup.py holds it.
-    
-    # SOLUTION: Use the 'screenshot' we just implemented? 
-    # taking a screenshot sees the SCREEN, not the WORLD.
-    
-    # We will try to open a NEW VideoCapture. Most webcams support multiple inputs OR fail.
-    # If it fails, we assume setup.py is running and we might need a different architectural approach.
-    # For now, let's try to capture 1 frame.
-    
-
-    if not vision_utils:
-        speak("My vision processing is disabled.")
-        return
-
-    import cv2
-    cam = cv2.VideoCapture(0)
-    ret, frame = cam.read()
-    cam.release()
-    
-    if ret:
-        objects = vision_utils.detect_objects_in_frame(frame)
-        if objects:
-            item_list = ", ".join(objects)
-            speak(f"I can see: {item_list}")
+    """Captures a frame and analyzes it using YOLO object detection."""
+    print("DEBUG: see_environment() called")
+    try:
+        # Import YOLO detector
+        from yolo_detector import get_detector
+        import shared_state
+        
+        print("DEBUG: Imports successful")
+        
+        # Use shared frame from shared_state (camera already open in setup.py)
+        frame = shared_state.latest_frame
+        
+        print(f"DEBUG: Frame is None: {frame is None}")
+        
+        if frame is not None:
+            print("DEBUG: Getting YOLO detector...")
+            # Get YOLO detector
+            detector = get_detector()
+            
+            print("DEBUG: Running detection...")
+            # Get detection summary
+            summary = detector.get_detection_summary(frame)
+            print(f"DEBUG: Summary: {summary}")
+            speak(summary)
         else:
-            speak("I don't see any familiar objects.")
-    else:
-        speak("I couldn't access the camera to see.")
+            speak("I couldn't access the camera feed.")
+            
+    except ImportError as e:
+        print(f"DEBUG: Import error: {e}")
+        speak("My vision system is not available. YOLO module not found.")
+    except Exception as e:
+        print(f"Vision Error: {e}")
+        import traceback
+        traceback.print_exc()
+        speak("I'm having trouble with my vision right now.")
 
 def system_control(command):
     if not pyautogui:
@@ -940,20 +939,26 @@ def process_command(command):
 
     # --- 3. Knowledge / Wikipedia ---
     if "who is" in command or "what is" in command or "tell me about" in command:
-        query = command.replace("who is", "").replace("what is", "").replace("tell me about", "").strip()
-        if wikipedia and query:
-            try:
-                speak(f"Searching for {query}...")
-                results = wikipedia.summary(query, sentences=2)
-                speak(results)
-            except wikipedia.exceptions.DisambiguationError:
-                speak("There are multiple results for that. Be more specific.")
-            except wikipedia.exceptions.PageError:
-                speak("I couldn't find anything on that.")
-            except Exception as e:
-                # speak("Something went wrong with the search.")
-                pass
-        return "continue"
+        # Exclude vision-related queries
+        vision_keywords = ["in my hand", "this", "in front", "holding", "see"]
+        if any(keyword in command for keyword in vision_keywords):
+            # Skip to next command handler (will be caught by YOLO commands below)
+            pass
+        else:
+            query = command.replace("who is", "").replace("what is", "").replace("tell me about", "").strip()
+            if wikipedia and query:
+                try:
+                    speak(f"Searching for {query}...")
+                    results = wikipedia.summary(query, sentences=2)
+                    speak(results)
+                except wikipedia.exceptions.DisambiguationError:
+                    speak("There are multiple results for that. Be more specific.")
+                except wikipedia.exceptions.PageError:
+                    speak("I couldn't find anything on that.")
+                except Exception as e:
+                    # speak("Something went wrong with the search.")
+                    pass
+            return "continue"
 
     # --- 4. Basic Time/Date ---
     if "time" in command:
@@ -1014,14 +1019,65 @@ def process_command(command):
         clean_temp_files()
         return "continue"
 
+    
+    # --- YOLO Vision Commands (MUST come before web search) ---
+    # Check for "in my hand" or "in hand" FIRST (most specific)
+    if ("in my hand" in command or "in hand" in command or 
+        "what am i holding" in command or "what's in my hand" in command or
+        ("what is" in command and "this" in command)):
+        try:
+            from yolo_detector import get_detector
+            import shared_state
+            
+            frame = shared_state.latest_frame
+            
+            if frame is not None:
+                detector = get_detector()
+                center_object, color = detector.get_center_object(frame)
+                
+                if center_object:
+                    if color and color != "unknown":
+                        speak(f"That looks like a {color} {center_object}.")
+                    else:
+                        speak(f"That looks like a {center_object}.")
+                else:
+                    speak("I don't see anything clearly in front of me.")
+            else:
+                speak("I couldn't access the camera.")
+        except Exception as e:
+            print(f"Vision Error: {e}")
+            import traceback
+            traceback.print_exc()
+            speak("I'm having trouble with my vision right now.")
+        return "continue"
+    
+    if "what objects" in command or "list objects" in command:
+        try:
+            from yolo_detector import get_detector
+            import shared_state
+            
+            frame = shared_state.latest_frame
+            
+            if frame is not None:
+                detector = get_detector()
+                object_names = detector.get_object_names(frame)
+                
+                if object_names:
+                    items = ", ".join(object_names)
+                    speak(f"I can detect: {items}.")
+                else:
+                    speak("I don't see any objects.")
+            else:
+                speak("I couldn't access the camera.")
+        except Exception as e:
+            print(f"Vision Error: {e}")
+            speak("I'm having trouble with my vision right now.")
+        return "continue"
+    
     if "what do you see" in command or "look at this" in command or "identify" in command:
-        # NOTE: This might crash if camera is busy by setup.py
-        # Ideally setup.py should handle this, but we put logic here.
-        # Let's try.
-        import cv2 # Late import
         see_environment()
         return "continue"
-
+    
     if "where am i" in command or "my location" in command:
         loc = get_location()
         if loc:
