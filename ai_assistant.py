@@ -897,7 +897,7 @@ def process_command(command):
             command = command.replace(clean_start, "").strip()
 
     # --- 1. System Commands ---
-    if any(k in command for k in ["exit", "quit", "shutdown", "terminate"]):
+    if any(k in command for k in ["exit", "quit", "shutdown", "terminate", "code 999", "999"]):
         speak("Goodbye!")
         return "exit"
     
