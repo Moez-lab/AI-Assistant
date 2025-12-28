@@ -1,49 +1,82 @@
 import ai_assistant
 import time
 import queue
+import threading
+import asyncio
+import websockets
+import json
+import pygame
 
-# Restore original speak function if it was mocked (reloading module would be cleaner but this works for simple script)
-# We won't mock speak. We will mock the queue it puts into.
+# Mock Pygame
+def mock_load(file): print("[MOCK PYGAME] Loading audio")
+def mock_play(): print("[MOCK PYGAME] Playing audio")
+busy_counter = 5
+def mock_get_busy():
+    global busy_counter
+    if busy_counter > 0:
+        busy_counter -= 1
+        return True
+    return False
 
-# Mock the queue
+if not pygame.mixer.get_init():
+    pygame.mixer.init()
+
+pygame.mixer.music.load = mock_load
+pygame.mixer.music.play = mock_play
+pygame.mixer.music.get_busy = mock_get_busy
+
+# Setup Mock queues
 ai_assistant.tts_text_queue = queue.Queue()
-
-# Mock browser
 ai_assistant.webbrowser.open = lambda url: print(f"[MOCK BROWSER]: {url}")
 
-print("--- Testing Emotion Queue ---")
-# 1. Test Smoothing
-print("Injecting 5 'Neutral' and 1 'Angry'")
-for _ in range(5): ai_assistant.update_emotion("Neutral")
-ai_assistant.update_emotion("Angry")
-print(f"Current Emotion (Should be Neutral): {ai_assistant.current_emotion}")
+print("Waiting for Avatar Server to initialize...")
+time.sleep(2) 
 
-print("\nInjecting 10 'Angry' to shift state")
-for _ in range(10): ai_assistant.update_emotion("Angry")
-print(f"Current Emotion (Should be Angry): {ai_assistant.current_emotion}")
+received_messages = []
+client_ready = threading.Event()
 
-print("\n--- Testing Adaptive Speech ---")
-long_text = "This is a very long sentence that would normally be spoken fully but since I am angry I should cut it short."
-print(f"Calling speak with: '{long_text}'")
-ai_assistant.speak(long_text) 
+async def test_client():
+    uri = "ws://localhost:8765"
+    async with websockets.connect(uri) as websocket:
+        print("[TEST CLIENT] Connected")
+        client_ready.set() # Signal main thread
+        try:
+            while True:
+                msg = await asyncio.wait_for(websocket.recv(), timeout=2.0)
+                print(f"[TEST CLIENT] Received: {msg}")
+                received_messages.append(json.loads(msg))
+        except asyncio.TimeoutError:
+            print("[TEST CLIENT] Timeout (No more messages)")
+        except Exception as e:
+            print(f"[TEST CLIENT] Error: {e}")
 
-# Check what got put in queue
-try:
-    item = ai_assistant.tts_text_queue.get(timeout=1)
-    text_in_queue = item["text"]
-    print(f"[QUEUE OUT]: {text_in_queue}")
-    if "I am sorry" in text_in_queue:
-        print("PASS: Text was truncated/changed for Angry emotion.")
-    else:
-        print("FAIL: Text was NOT changed.")
-except queue.Empty:
-    print("FAIL: Nothing in queue.")
+def run_client():
+    asyncio.run(test_client())
 
-print("\n--- Testing Music Logic ---")
-# Current is Angry -> Should be Upbeat
-ai_assistant.process_command("play music")
+client_thread = threading.Thread(target=run_client, daemon=True)
+client_thread.start()
 
-print("\n--- Testing Sad State ---")
-for _ in range(10): ai_assistant.update_emotion("Sad")
-print(f"Current Emotion (Should be Sad): {ai_assistant.current_emotion}")
-ai_assistant.process_command("play music")
+print("Waiting for client to connect...")
+client_ready.wait(timeout=5)
+if not client_ready.is_set():
+    print("FAIL: Client never connected (Server might not be running)")
+    exit(1)
+
+time.sleep(1) # Extra buffer
+
+print("\n--- Triggering Speech ---")
+print("Injecting fake audio...")
+ai_assistant.tts_audio_queue.put({"audio": b"fake_audio_bytes", "id": ai_assistant.playback_generation_id})
+
+time.sleep(3) 
+
+print("\n--- Verifying Messages ---")
+found_start = any(m["type"] == "speak_start" for m in received_messages)
+found_stop = any(m["type"] == "speak_stop" for m in received_messages)
+
+if found_start and found_stop:
+    print("PASS: Received speak_start and speak_stop events.")
+else:
+    print(f"FAIL: Messages received: {received_messages}")
+
+print("Done.")

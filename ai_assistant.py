@@ -110,10 +110,49 @@ import threading
 import sys
 from collections import deque
 import random
+import asyncio
+import websockets
+import json
 
 # --- Emotion State ---
 emotion_queue = deque(maxlen=10) # Store last 10 emotions for smoothing
 current_emotion = "Neutral"
+
+# --- Avatar WebSocket State ---
+connected_clients = set()
+avatar_loop = None
+
+async def avatar_handler(websocket):
+    connected_clients.add(websocket)
+    try:
+        await websocket.wait_closed()
+    except:
+        pass
+    finally:
+        connected_clients.remove(websocket)
+
+async def broadcast_avatar_message(message_type, data=None):
+    if connected_clients:
+        message = json.dumps({"type": message_type, "data": data})
+        # Broadcast to all connected clients
+        # We need to schedule this on the avatar_loop
+        websockets.broadcast(connected_clients, message)
+
+def avatar_server_worker():
+    """Runs the WebSocket server for the 3D Avatar."""
+    async def main():
+        global avatar_loop
+        avatar_loop = asyncio.get_running_loop()
+        async with websockets.serve(avatar_handler, "localhost", 8765):
+            print("Avatar Server running on ws://localhost:8765")
+            await asyncio.Future() # Run forever
+
+    # Create new event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(main())
+
+threading.Thread(target=avatar_server_worker, daemon=True, name="Avatar_Server").start()
 
 def update_emotion(new_emotion):
     """Updates the internal emotion state with smoothing."""
@@ -203,6 +242,12 @@ def tts_player_worker():
                          
                     audio_buffer = io.BytesIO(audio_bytes)
                     pygame.mixer.music.load(audio_buffer)
+                    
+                    # Notify Avatar: START
+                    # We need to run async function from sync thread.
+                    if avatar_loop:
+                        asyncio.run_coroutine_threadsafe(broadcast_avatar_message("speak_start"), avatar_loop)
+                    
                     pygame.mixer.music.play()
                     
                     # BLOCKING WAIT (while verifying not stopped)
@@ -211,6 +256,10 @@ def tts_player_worker():
                             pygame.mixer.music.stop()
                             break
                         time.sleep(0.05)
+                        
+                    # Notify Avatar: STOP
+                    if avatar_loop:
+                        asyncio.run_coroutine_threadsafe(broadcast_avatar_message("speak_stop"), avatar_loop)
                         
             except Exception as e:
                 print(f"Playback Error: {e}")
@@ -287,6 +336,17 @@ def speak(text):
     
     text = text.strip()
     if text:
+        # Notify Avatar: Start Speaking
+        # We can't await here easily as we are in main thread logic potentially.
+        # But we can fire-and-forget via the loop if accessible, or just queue it.
+        # Ideally, we put a "message" in the audio queue too? 
+        # Actually, simpler: Use the tts_player_worker to send events when AUDIO actually starts/stops.
+        # But for now, let's just send "start" when we queue it (slightly early but okay)
+        
+        # NOTE: Syncing perfectly requires the PLAYER to send the event.
+        # Let's modify the PLAYER worker instead?
+        # Yes, let's do that. See below modifications to tts_player_worker.
+        
         # Push with current ID
         tts_text_queue.put({"text": text, "id": playback_generation_id})
 # (Rest of the file unchanged until process_command/chat)
@@ -398,10 +458,12 @@ def see_environment():
     # If it fails, we assume setup.py is running and we might need a different architectural approach.
     # For now, let's try to capture 1 frame.
     
+
     if not vision_utils:
         speak("My vision processing is disabled.")
         return
 
+    import cv2
     cam = cv2.VideoCapture(0)
     ret, frame = cam.read()
     cam.release()
