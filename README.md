@@ -1,4 +1,4 @@
-# J.A.R.V.I.S. AI Assistant - "The Upgrade"
+# J.A.R.V.I.S. AI Assistant
 
 Welcome to your advanced **Hybrid AI Assistant**! This system combines a powerful Python backend with a stunning 3D React frontend to create a futuristic, interactive assistant.
 
