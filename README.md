@@ -15,6 +15,8 @@ This project runs on a **parallel multi-threaded architecture**:
 | **Communication**| **WebSockets** (Port 8765) | Real-time sync between Brain & Avatar |
 | **Search** | **Selenium** | Automated Product Search (Google Lens) |
 
+![Feature Map](assets/feature_map.png)
+
 ---
 
 ## 🚀 How to Start
