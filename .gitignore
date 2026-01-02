@@ -1,0 +1,27 @@
+# --- Privacy & Personal Data ---
+face-database/
+reminders.json
+settings.json
+temp_voice.mp3
+temp_search.jpg
+*.env
+*.key
+.serpapi_key
+
+# --- System & Dependencies ---
+__pycache__/
+*.py[cod]
+*$py.class
+.vscode/
+.idea/
+.DS_Store
+
+# --- Web Interface ---
+web_interface/node_modules/
+web_interface/dist/
+web_interface/.env
+
+# --- Large Models (Optional - Uncomment if you want to push them) ---
+*.pt
+*.caffemodel
+*.weights
