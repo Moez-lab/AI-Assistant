@@ -21,6 +21,10 @@ result_queue = queue.Queue(maxsize=1)
 assistant_status = "Idle"
 known_faces_path = "C:/Users/mueez/OneDrive/Desktop/assignment/face-database/"
 
+# Ensure database exists
+if not os.path.exists(known_faces_path):
+    os.makedirs(known_faces_path)
+
 def face_recognition_worker():
     """Background thread that processes frames for faces."""
     print("Brain Thread (Vision) Started...")
@@ -29,6 +33,15 @@ def face_recognition_worker():
             # Get frame (blocking until available)
             frame = frame_queue.get()
             
+            # Check if database has images
+            db_files = [f for f in os.listdir(known_faces_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+            
+            if not db_files:
+                # DB Empty - Skip recognition
+                if not result_queue.full():
+                    result_queue.put(("DB_EMPTY", 0.0, "Neutral"))
+                continue
+
             # Run DeepFace (Heavy computation)
             # using 'ssd' backend as it is faster/more robust than opencv
             results = DeepFace.find(
@@ -107,6 +120,7 @@ frame_count = 0
 unknown_counter = 0
 sentry_mode_triggered = False
 emotion = "Neutral"
+db_empty_warning = False
 
 while True:
     ret, frame = cap.read()
@@ -124,8 +138,14 @@ while True:
     try:
         # Unpack 3 values now
         name, distance, emotion = result_queue.get_nowait()
-        last_name = name
-        last_distance = distance
+        
+        if name == "DB_EMPTY":
+            db_empty_warning = True
+            last_name = "Setup Needed"
+        else:
+            db_empty_warning = False
+            last_name = name
+            last_distance = distance
         
         # --- SENTRY MODE LOGIC ---
         if name == "Unknown":
@@ -201,7 +221,11 @@ while True:
     cv2.line(frame, (width-20, height-20), (width-20, height-20-d), emotion_color, t)
     
     # Identification Box
-    if last_name not in ["Unknown", "Scanning..."]:
+    if db_empty_warning:
+        box_color = (0, 165, 255) # Orange
+        display_text = "DB EMPTY: Press 's' to enroll"
+        cv2.putText(frame, "NO FACE DATA FOUND", (width//2 - 150, height//2), cv2.FONT_HERSHEY_SIMPLEX, 1, box_color, 2)
+    elif last_name not in ["Unknown", "Scanning...", "Setup Needed"]:
         # Recognized - Green Box
         box_color = Green 
         display_text = f"ID: {last_name.upper()} [{last_distance:.2f}]"
@@ -215,7 +239,7 @@ while True:
         display_text = f"{last_name} ({last_distance:.2f}) [{emotion}]" if last_distance > 0 else last_name
     
     # Sentry Override
-    if sentry_mode_triggered:
+    if sentry_mode_triggered and not db_empty_warning:
         # Flash Red
         if frame_count % 10 < 5:
             cv2.rectangle(frame, (0,0), (width, height), (0,0,255), 20)
@@ -258,8 +282,18 @@ while True:
     cv2.putText(frame, assistant_status, (50, 430), cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
     
     cv2.imshow("Parallel AI System", frame)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
+    
+    key = cv2.waitKey(1) & 0xFF
+    if key == ord("q"):
         break
+    elif key == ord("s"): # Save face
+        face_path = os.path.join(known_faces_path, "mueez.jpg")
+        cv2.imwrite(face_path, frame)
+        print(f"saved face to {face_path}")
+        # Add visual feedback
+        cv2.putText(frame, "SAVED FACE!", (width//2 - 50, height//2), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
+        cv2.imshow("Parallel AI System", frame)
+        cv2.waitKey(500) # Pause briefly to show message
 
 cap.release()
 cv2.destroyAllWindows()

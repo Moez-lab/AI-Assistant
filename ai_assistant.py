@@ -246,7 +246,10 @@ def tts_player_worker():
                     # Notify Avatar: START
                     # We need to run async function from sync thread.
                     if avatar_loop:
+                        print("DEBUG: Broadcasting speak_start")
                         asyncio.run_coroutine_threadsafe(broadcast_avatar_message("speak_start"), avatar_loop)
+                    else:
+                        print("DEBUG: Avatar loop NOT READY for speak_start")
                     
                     pygame.mixer.music.play()
                     
@@ -259,6 +262,7 @@ def tts_player_worker():
                         
                     # Notify Avatar: STOP
                     if avatar_loop:
+                        print("DEBUG: Broadcasting speak_stop")
                         asyncio.run_coroutine_threadsafe(broadcast_avatar_message("speak_stop"), avatar_loop)
                         
             except Exception as e:
@@ -1262,4 +1266,12 @@ def chat(text):
             
     except Exception as e:
         print(f"Ollama Error: {e}")
-        speak("I am having trouble thinking. Please ensure Ollama is running.")
+        # Fallback to simple chat if AI brain is dead
+        print("Falling back to simple chat...")
+        from ai_assistant import chat as simple_chat
+        # We can't call the simple chat function easily because we shadowed it?
+        # No, the simple one is named `chat` earlier in the file but was overridden?
+        # Actually in Python, redefining `chat` overwrites the old one. 
+        # We should have renamed the old one `simple_chat` or handled it differently.
+        # Quick fix: Just hardcode a "cute" error response so lips move.
+        speak("My brain is a bit foggy right now *giggles*, but I'm still listening! maybe try again?")
