@@ -389,28 +389,63 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                     c.visible = true;
                     c.frustumCulled = false; // Prevent flickering
 
+
+
                     // Make hair material brighter and more receptive to light
                     if (c.material) {
-                        // Add subtle emissive glow to make hair visible
-                        c.material.emissive = new THREE.Color(0x444444); // Brighter gray glow
-                        c.material.emissiveIntensity = 1.0; // Increased from 0.3
+                        console.log('=== HAIR DEBUG: Applying position-based split to:', c.name, 'Material:', c.material.type);
 
-                        // Lighten the base color slightly
-                        if (c.material.color) {
-                            c.material.color.multiplyScalar(2.5); // Much brighter
-                        }
-
-                        // Increase roughness to catch more light
-                        if (c.material.roughness !== undefined) {
-                            c.material.roughness = Math.min(c.material.roughness * 1.2, 1.0);
-                        }
-
-                        c.material.needsUpdate = true;
+                        // Use ShaderMaterial for position-based coloring
+                        c.material = new THREE.ShaderMaterial({
+                            uniforms: {
+                                lightDirection: { value: new THREE.Vector3(0, 1, 0) },
+                                ambientColor: { value: new THREE.Color(0x404040) },
+                                cyanColor: { value: new THREE.Color(0x00D4FF) },  // Bright cyan
+                                redColor: { value: new THREE.Color(0xCC0000) }     // Deep red
+                            },
+                            vertexShader: `
+                                varying vec3 vNormal;
+                                varying vec3 vPosition;
+                                
+                                void main() {
+                                    vNormal = normalize(normalMatrix * normal);
+                                    vPosition = position;
+                                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                                }
+                            `,
+                            fragmentShader: `
+                                uniform vec3 lightDirection;
+                                uniform vec3 ambientColor;
+                                uniform vec3 cyanColor;
+                                uniform vec3 redColor;
+                                
+                                varying vec3 vNormal;
+                                varying vec3 vPosition;
+                                
+                                void main() {
+                                    // Split based on X position (left = cyan, right = red)
+                                    float splitPosition = vPosition.x;
+                                    float mixFactor = smoothstep(-0.02, 0.02, splitPosition);
+                                    vec3 baseColor = mix(cyanColor, redColor, mixFactor);
+                                    
+                                    // Simple lighting
+                                    float diffuse = max(dot(vNormal, lightDirection), 0.0);
+                                    vec3 lighting = ambientColor + vec3(diffuse * 0.8);
+                                    
+                                    // Add glossy shine
+                                    vec3 finalColor = baseColor * lighting * 1.5;
+                                    
+                                    gl_FragColor = vec4(finalColor, 1.0);
+                                }
+                            `,
+                            side: THREE.DoubleSide
+                        });
                     }
                 }
             }
         });
         window.HAIR_MESHES = hairMeshes; // Expose for debug
+        console.log('=== HAIR DEBUG: Total hair meshes found:', hairMeshes.length);
 
 
         // BONE MAPPING (Skeleton based - Robust)
