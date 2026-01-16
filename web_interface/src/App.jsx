@@ -153,14 +153,21 @@ function App() {
             color="#ffffff"
           />
 
-          {/* Top Hair Light - Illuminates hair from above */}
+          {/* Top Hair Light - Repositioned closer and stronger */}
           <spotLight
-            position={[0, 8, 0]}
+            position={[0, 4, 2]}
+            intensity={30.0}
+            color="#ffffff"
+            angle={0.8}
+            penumbra={0.2}
+            target-position={[0, 1.8, 0]}
+          />
+
+          {/* Additional Hair Rim Light from behind */}
+          <pointLight
+            position={[0, 3, -3]}
             intensity={15.0}
             color="#ffffff"
-            angle={0.6}
-            penumbra={0.3}
-            target-position={[0, 1.5, 0]}
           />
 
 

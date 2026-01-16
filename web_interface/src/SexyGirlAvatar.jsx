@@ -388,6 +388,25 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                     // Ensure hair is visible
                     c.visible = true;
                     c.frustumCulled = false; // Prevent flickering
+
+                    // Make hair material brighter and more receptive to light
+                    if (c.material) {
+                        // Add subtle emissive glow to make hair visible
+                        c.material.emissive = new THREE.Color(0x444444); // Brighter gray glow
+                        c.material.emissiveIntensity = 1.0; // Increased from 0.3
+
+                        // Lighten the base color slightly
+                        if (c.material.color) {
+                            c.material.color.multiplyScalar(2.5); // Much brighter
+                        }
+
+                        // Increase roughness to catch more light
+                        if (c.material.roughness !== undefined) {
+                            c.material.roughness = Math.min(c.material.roughness * 1.2, 1.0);
+                        }
+
+                        c.material.needsUpdate = true;
+                    }
                 }
             }
         });
