@@ -21,6 +21,8 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
     const leftEyeBoneRef = useRef();
     const rightEyeBoneRef = useRef();
     const headBoneRef = useRef();
+    const eyeBaseRotation = useRef({ left: new THREE.Euler(), right: new THREE.Euler() });
+
 
     // Blink State
     const blinkTimer = useRef(0);
@@ -439,7 +441,14 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                             name.includes('eye') || matName.includes('eye') ||
                             name.includes('lash') || matName.includes('lash') ||
                             name.includes('brow') || matName.includes('brow') ||
-                            name.includes('mouth') || matName.includes('mouth');
+                            name.includes('mouth') || matName.includes('mouth') ||
+                            // Explicit Eye Parts (often named specifically)
+                            name.includes('cornea') || matName.includes('cornea') ||
+                            name.includes('pupil') || matName.includes('pupil') ||
+                            name.includes('iris') || matName.includes('iris') ||
+                            name.includes('sclera') || matName.includes('sclera') ||
+                            name.includes('lens') || matName.includes('lens');
+
 
                         const isDebug = name.includes('debug'); // Keep debug plane if needed?
 
@@ -471,10 +480,13 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                 // Eyes
                 if (name.includes('l_eye') || (name.includes('left') && name.includes('eye'))) {
                     leftEyeBoneRef.current = bone;
+                    eyeBaseRotation.current.left.copy(bone.rotation);
                 }
                 if (name.includes('r_eye') || (name.includes('right') && name.includes('eye'))) {
                     rightEyeBoneRef.current = bone;
+                    eyeBaseRotation.current.right.copy(bone.rotation);
                 }
+
                 // Arms
                 if (name.includes('l_upperarm') && !name.includes('twist')) {
                     leftUpperArmRef.current = bone;
@@ -720,21 +732,26 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
             leftEyeBoneRef.current.scale.set(1, scaleY, 1);
             rightEyeBoneRef.current.scale.set(1, scaleY, 1);
 
-            // Eye Gaze
-            const eyeX = (facePosition.x || 0) * 0.5; // Eyes move more than head
-            const eyeY = (facePosition.y || 0) * 0.5;
+            // Eye Gaze - DISABLED (user preference: eyes look odd when moving)
+            // Head tracking is sufficient for natural look
+            /*
+            const eyeX = (facePosition.x || 0) * 0.8; 
+            const eyeY = (facePosition.y || 0) * 0.8;
 
-            // X input -> Y rotation (Yaw)
-            // Y input -> X rotation (Pitch)
-            // Invert as needed based on coordinate system
-            const targetEyeRotY = -eyeX;
-            const targetEyeRotX = -eyeY;
+            const offsetX = -eyeY;
+            const offsetY = -eyeX;
 
-            leftEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.y, targetEyeRotY, 0.2);
-            leftEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.x, targetEyeRotX, 0.2);
+            const baseLeft = eyeBaseRotation.current.left;
+            const baseRight = eyeBaseRotation.current.right;
 
-            rightEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.y, targetEyeRotY, 0.2);
-            rightEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.x, targetEyeRotX, 0.2);
+            leftEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.x, baseLeft.x + offsetX, 0.2);
+            leftEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.y, baseLeft.y + offsetY, 0.2);
+
+            rightEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.x, baseRight.x + offsetX, 0.2);
+            rightEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.y, baseRight.y + offsetY, 0.2);
+            */
+
+
         }
 
 

@@ -155,20 +155,23 @@
   letter-spacing: 2px;
 }
 
-/* Background grid/noise (Optional CSS embellishment) */
+/* Background grid/noise - DISABLED (user request) */
 .hud-overlay-grid {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  /* Grid removed for cleaner look
   background-image:
     linear-gradient(rgba(255, 191, 0, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 191, 0, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
   mask-image: radial-gradient(circle, rgba(0, 0, 0, 1) 30%, rgba(0, 0, 0, 0) 80%);
+  */
   z-index: -1;
 }
+
 
 .status-overlay {
   /* Hide old overlay or restyle it */

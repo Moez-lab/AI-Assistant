@@ -28,7 +28,11 @@ def face_tracking_worker(broadcast_func, loop):
                 time.sleep(0.1)
                 continue
 
+            # Flip frame horizontally to remove mirror effect
+            frame = cv2.flip(frame, 1)
+
             # Convert to Grayscale for detection
+
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             
             # Detect faces
@@ -46,11 +50,9 @@ def face_tracking_worker(broadcast_func, loop):
                 center_y = y + h / 2
                 
                 # Normalize to -1 ... 1 range
-                # X: 0 (left) -> 1 (right) => Map to -1 (left) -> 1 (right)
-                # Note: Camera is mirrored usually?
-                # If user moves left (x decreases), center_x decreases. 
-                # Normalized: (center_x / frame_w) * 2 - 1
+                # Match camera view: avatar looks same direction as you appear in camera
                 norm_x = (center_x / frame_w) * 2 - 1
+
                 
                 # Y: 0 (top) -> 1 (bottom) => Map to 1 (up) -> -1 (down) 
                 # In 3D: +Y is Up. In Image: +Y is Down.

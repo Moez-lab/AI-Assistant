@@ -126,8 +126,12 @@ while True:
     ret, frame = cap.read()
     if not ret: break
     
+    # Flip frame horizontally for correct display orientation
+    frame = cv2.flip(frame, 1)
+    
     # Store latest frame for YOLO access
     shared_state.latest_frame = frame.copy()
+
     
     # 1. Send frame to Brain Thread (Non-blocking)
     if frame_count % 5 == 0: # Check face every 5 frames
@@ -281,7 +285,10 @@ while True:
     elif assistant_status == "Processing...": status_color = (0, 0, 255)
     cv2.putText(frame, assistant_status, (50, 430), cv2.FONT_HERSHEY_SIMPLEX, 1, status_color, 2)
     
+    
     cv2.imshow("Parallel AI System", frame)
+
+
     
     key = cv2.waitKey(1) & 0xFF
     if key == ord("q"):
