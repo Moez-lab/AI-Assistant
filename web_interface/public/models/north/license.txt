@@ -1,8 +1,0 @@
-Model Information:
-* title:	North - Detroit: Become Human
-* source:	https://sketchfab.com/3d-models/north-detroit-become-human-2ef36e3915664cd7be75a330d2afc12f
-* author:	Q.SARDOR (https://sketchfab.com/qsardor57913)
-
-Model License:
-* license type:	SKETCHFAB Standard (https://sketchfab.com/licenses)
-* requirements:	Under basic restrictions, use worldwide, on all types of media, commercially or not, and in all types of derivative works

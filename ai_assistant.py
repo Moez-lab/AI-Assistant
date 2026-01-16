@@ -124,6 +124,13 @@ avatar_loop = None
 
 async def avatar_handler(websocket):
     connected_clients.add(websocket)
+    print("Web Client Connected. initialization sequence...")
+    
+    # Trigger a voice greeting to verify audio + lip-sync
+    # We offload this to the main loop to avoid blocking async
+    # (Though speak() just queues text, so it's fast)
+    speak("Visual systems connected. Ready for commands.")
+    
     try:
         await websocket.wait_closed()
     except:
@@ -139,13 +146,22 @@ async def broadcast_avatar_message(message_type, data=None):
         websockets.broadcast(connected_clients, message)
 
 def avatar_server_worker():
-    """Runs the WebSocket server for the 3D Avatar."""
+    import face_tracker # Import here to avoid circularity if any
+
     async def main():
         global avatar_loop
         avatar_loop = asyncio.get_running_loop()
+        
+        # Start Face Tracking Thread
+        threading.Thread(target=face_tracker.face_tracking_worker, 
+                         args=(broadcast_avatar_message, avatar_loop), 
+                         daemon=True, 
+                         name="Face_Tracker").start()
+
         async with websockets.serve(avatar_handler, "localhost", 8765):
             print("Avatar Server running on ws://localhost:8765")
             await asyncio.Future() # Run forever
+
 
     # Create new event loop for this thread
     loop = asyncio.new_event_loop()

@@ -40,6 +40,7 @@ class ErrorBoundary extends React.Component {
 
 function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [facePosition, setFacePosition] = useState({ x: 0, y: 0 }); // New State
   const [status, setStatus] = useState("Connecting...");
   const [debugInfo, setDebugInfo] = useState("");
 
@@ -52,12 +53,19 @@ function App() {
           const message = JSON.parse(event.data);
           if (message.type === 'speak_start') setIsSpeaking(true);
           else if (message.type === 'speak_stop') setIsSpeaking(false);
+          else if (message.type === 'face_track') {
+            // Expecting data: { x: float, y: float } (Normalized -1 to 1)
+            // Smooth lerp could be done here or in component. 
+            // We'll pass raw target to component.
+            setFacePosition(message.data);
+          }
         } catch (e) { console.error(e); }
       };
       ws.onclose = () => { setStatus("Disconnected"); setTimeout(connect, 3000); };
       ws.onerror = () => ws.close();
       return ws;
     };
+
     const ws = connect();
     return () => ws.close();
   }, []);
@@ -103,8 +111,19 @@ function App() {
 
         {/* Debug/Status Footer */}
         <div className="status-overlay">
+          <span style={{
+            display: 'inline-block',
+            width: '10px',
+            height: '10px',
+            borderRadius: '50%',
+            backgroundColor: status === "Connected" ? '#0f0' : '#f00',
+            marginRight: '8px',
+            boxShadow: status === "Connected" ? '0 0 8px #0f0' : 'none'
+          }}></span>
           Status: {status} | Action: {isSpeaking ? "Speaking" : "Idle"}
+          | Face: {facePosition.x?.toFixed(2)}, {facePosition.y?.toFixed(2)}
           <br />Last Signal: {debugInfo.split('\n')[0] || "None"}
+
           <div style={{ fontSize: '10px' }}>{debugInfo}</div>
         </div>
 
@@ -169,8 +188,9 @@ function App() {
           <Stars radius={100} depth={50} count={3000} factor={4} saturation={0} fade speed={1} />
 
           <React.Suspense fallback={null}>
-            <SexyGirlAvatar isSpeaking={isSpeaking} setDebugInfo={setDebugInfo} />
+            <SexyGirlAvatar isSpeaking={isSpeaking} setDebugInfo={setDebugInfo} facePosition={facePosition} />
           </React.Suspense>
+
 
           {/* Limit Controls to Face Area */}
           <OrbitControls
@@ -181,13 +201,14 @@ function App() {
           />
 
           {/* Post Processing for Film Look */}
-          <EffectComposer disableNormalPass>
+          {/* Post Processing for Film Look - DISABLED FOR DEBUGGING */
+          /* <EffectComposer disableNormalPass>
             <Bloom luminanceThreshold={0.7} luminanceSmoothing={0.9} height={300} intensity={0.8} />
-            {/* Chromatic Aberration removed for stability */}
+             Chromatic Aberration removed for stability
             <Noise opacity={0.03} />
             <Vignette eskil={false} offset={0.1} darkness={1.0} />
             <ToneMapping />
-          </EffectComposer>
+          </EffectComposer> */ }
         </Canvas>
       </div>
     </ErrorBoundary>

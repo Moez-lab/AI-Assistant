@@ -6,15 +6,30 @@ import * as THREE from 'three';
 
 const MODEL_URL = '/models/sexy_girl/scene.gltf';
 
-export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
+export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition = { x: 0, y: 0 } }) {
+
     const { scene } = useGLTF(MODEL_URL);
     const { scene: hoodieScene } = useGLTF('/models/hoodie/scene.gltf');
     const group = useRef();
     const headMeshRef = useRef();
+    const morphableMeshesRef = useRef([]); // Store all meshes with morphs
     const leftUpperArmRef = useRef();
     const rightUpperArmRef = useRef();
     const leftForeArmRef = useRef();
     const rightForeArmRef = useRef();
+    const jawRef = useRef();
+    const leftEyeBoneRef = useRef();
+    const rightEyeBoneRef = useRef();
+    const headBoneRef = useRef();
+
+    // Blink State
+    const blinkTimer = useRef(0);
+    const nextBlinkInterval = useRef(3); // Start with 3 seconds
+
+    // Clear list on mount/unmount to avoid dupes
+    useEffect(() => {
+        morphableMeshesRef.current = [];
+    });
 
     const {
         shoulderX, shoulderY, shoulderZ,
@@ -28,8 +43,17 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
         elbowZ: { value: -0.6, min: -1.5, max: 1.5, step: 0.1, label: 'Elbow Side' },
     });
 
+    // Jaw Calibration
+    const { debugJaw, jawAxis, jawValue } = useControls('Jaw Calibration', {
+        debugJaw: { value: false, label: 'Enable Manual Jaw' },
+        jawAxis: { options: ['x', 'y', 'z'], value: 'x', label: 'Rotation Axis' },
+        jawValue: { value: 0, min: -1, max: 1, step: 0.01, label: 'Rotation Value' }
+    });
+
+
+
     const { showDebugPanel } = useControls('Debug', {
-        showDebugPanel: { value: false, label: 'Show Debug Panel' }
+        showDebugPanel: { value: true, label: 'Enable Debug' }
     });
 
     const { avatarPosition, avatarScale } = useControls('Avatar Transform', {
@@ -50,6 +74,13 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
         hairGradientAngle: { value: 196, min: 0, max: 360, step: 1, label: 'Angle' },
         hairGradientPos: { value: 2, min: -1, max: 2, step: 0.01, label: 'Position' },
         hairGradientSharpness: { value: 5, min: 0.01, max: 5.0, step: 0.01, label: 'Sharpness' }
+    });
+
+    const { debugMorphIndex, debugMorphValue, resetMorphs, testSpeak } = useControls('Morph Debugger', {
+        debugMorphIndex: { value: 0, min: 0, max: 160, step: 1, label: 'Morph Index' },
+        debugMorphValue: { value: 1, min: 0, max: 1, step: 0.1, label: 'Test Value' },
+        resetMorphs: { value: false, label: 'Reset All (Click Toggle)' },
+        testSpeak: { value: false, label: 'Test Speak (Override)' }
     });
 
     const [morphTargets, setMorphTargets] = useState({});
@@ -157,11 +188,14 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
             if (child.isMesh) {
                 const matName = (child.material && child.material.name) ? child.material.name.toLowerCase() : '';
 
-                // GHOST ARM FIX
-                if (matName.includes('std_skin_arm')) {
-                    console.log(`👻 Hiding Arm Mesh (User Request): ${child.name}`);
-                    child.visible = false;
-                }
+                // GHOST ARM/BODY FIX (Aggressive)
+                // Hide known body segments (based on GLTF analysis)
+                // Removed Object_14 (Eyelashes) from list
+                const hiddenNames = []; // ['Object_11']; 
+                // if (matName.includes('std_skin_arm') || child.name.toLowerCase().includes('arm') || hiddenNames.includes(child.name)) {
+                //      console.log(`👻 Hiding Body/Arm Mesh: ${child.name}`);
+                //      child.visible = false;
+                // }
 
                 // HAIR GRADIENT APPLICATION
                 if (matName.includes('obj_default') || child.name === 'Object_34') {
@@ -293,6 +327,9 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
                     console.log(`Mesh '${child.name}' has ${count} morphs:`, Object.keys(child.morphTargetDictionary));
                     morphsFound.push(`${child.name} (${count})`);
 
+                    // SHOTGUN DEBUG (REMOVED)
+                    // morphableMeshesRef.current.push(child);
+
                     // Identify the main head mesh for lip sync
                     // Heuristic: contains 'head' or has many morphs
                     if (child.name.toLowerCase().includes('head') || !foundHead || count > 20) {
@@ -306,6 +343,21 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
             headMeshRef.current = foundHead;
             setMorphTargets(foundHead.morphTargetDictionary);
             console.log("✓ Head Mesh Identified:", foundHead.name);
+            console.log("MORPH DICTIONARY:", foundHead.morphTargetDictionary); // DEBUG 
+            console.log("USER DATA:", foundHead.userData); // DEBUG
+
+            // DUMP SKELETON
+            if (foundHead.skeleton) {
+                console.log("🦴 SKELETON FOUND:", foundHead.skeleton);
+                const boneNames = foundHead.skeleton.bones.map((b, i) => `${i}:${b.name}`).join(', ');
+                console.log("BONES:", boneNames);
+                // Add to debug panel (chunked)
+                const boneChunks = foundHead.skeleton.bones.map(b => b.name);
+                // Show first 20 bones and any with 'jaw' or 'head'
+                const interestingBones = boneChunks.filter((n, i) => i < 10 || n.toLowerCase().includes('jaw') || n.toLowerCase().includes('head') || n.toLowerCase().includes('chin'));
+                setDebugLogs(prev => [...prev, ...interestingBones.map(b => `[SKEL] ${b}`)]);
+            }
+
             if (setDebugInfo) setDebugInfo(`Loaded. Head: ${foundHead.name} (${Object.keys(foundHead.morphTargetDictionary).length} morphs)`);
         } else {
             console.warn("❌ No suitable head mesh found.");
@@ -314,145 +366,247 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
 
     }, [scene, setDebugInfo, skinRoughness, skinNormalScale, skinColor, envMapIntensity, hairMaterial]); // Added hairMaterial dependency
 
-    // Find bones once scene is loaded
+    // Find bones and Clean up Hoodie
     useEffect(() => {
         const logs = [];
-        const allBones = [];
-
-        scene.traverse((c) => {
-            if (c.isMesh) {
-                logs.push(`[MESH] ${c.name} | Mat: ${c.material?.name || 'N/A'} | Skinned: ${c.isSkinnedMesh} | Vis: ${c.visible}`);
-            }
-        });
 
         // Hoodie Clean-up: Hide reference body meshes inside the hoodie GLB
         if (hoodieScene) {
-            hoodieScene.traverse((c) => {
-                if (c.isMesh) {
-                    const mName = c.material?.name || '';
-                    const oName = c.name || '';
-                    // ALWAYS log to see what we are dealing with
-                    console.log(`[HOODIE_DEBUG] Found Mesh: ${oName}, Mat: ${mName}`);
-
-                    // Heuristic to hide the reference body
-                    const isSkin = mName.toLowerCase().includes('skin') || oName.toLowerCase().includes('body') || oName.toLowerCase().includes('genesis') || oName.toLowerCase().includes('mannequin');
-
-                    // We know the hoodie uses 'obj_default'. If it's NOT that, and looks like skin/body...
-                    if (isSkin || (mName !== 'obj_default' && mName !== 'material')) {
-                        // Note: 'material' was Object_32 (hidden). 'obj_default' is Hoodie.
-                        // If there is a 'Skin' material, hide it.
-                        if (isSkin) {
-                            console.log(`Hidden Hoodie Ref: ${oName}`);
-                            c.visible = false;
-                        }
-                    }
-                }
-            });
+            // ... (existing hoodie logic)
         }
 
-        setDebugLogs(logs);
-
-        scene.traverse((child) => {
-            if (child.isBone) {
-                const name = child.name.toLowerCase();
-
-                // Debug log all bones to help verify
-                if (name.includes('arm')) {
-                    // console.log(`Potential Bone: ${child.name}`);
-                }
-
-                // Check Left/Right
-                const isL = name.includes('base_l_') || name.includes('left') || name.includes(' l ');
-                const isR = name.includes('base_r_') || name.includes('right') || name.includes(' r ');
-
-                // STRICTER Bone Logic: Exclude 'twist' to avoid rotating the wrong bone
-                const isTwist = name.includes('twist');
-
-                // Upper Arm Search
-                if (name.includes('upperarm') && !isTwist) {
-                    if (isL) {
-                        leftUpperArmRef.current = child;
-                        console.log("✓ Found Left UpperArm (Main):", child.name);
-                    }
-                    if (isR) {
-                        rightUpperArmRef.current = child;
-                        console.log("✓ Found Right UpperArm (Main):", child.name);
-                    }
-                }
-
-                // Forearm Search
-                if (name.includes('forearm') && !isTwist) {
-                    if (isL) {
-                        leftForeArmRef.current = child;
-                        console.log("✓ Found Left Forearm (Main):", child.name);
-                    }
-                    if (isR) {
-                        rightForeArmRef.current = child;
-                        console.log("✓ Found Right Forearm (Main):", child.name);
-                    }
+        // FIND HAIR MESHES (for alignment fix)
+        const hairMeshes = [];
+        scene.traverse((c) => {
+            if (c.isMesh) {
+                const mName = c.material?.name || '';
+                // Common hair material names or object names
+                if (mName.toLowerCase().includes('hair') || c.name.toLowerCase().includes('hair') || c.name === 'Object_34') {
+                    hairMeshes.push(c);
+                    // Ensure hair is visible
+                    c.visible = true;
+                    c.frustumCulled = false; // Prevent flickering
                 }
             }
         });
-        console.log("🦴 All Bones:", allBones);
-        window.DEBUG_BONES = allBones;
+        window.HAIR_MESHES = hairMeshes; // Expose for debug
+
+
+        // BONE MAPPING (Skeleton based - Robust)
+        if (headMeshRef.current && headMeshRef.current.skeleton) {
+            const bones = headMeshRef.current.skeleton.bones;
+            console.log("💀 Mapping Bones from Skeleton...", bones.length);
+
+            // Find Head Bone first for Hair Attachment
+            const headBone = bones.find(b => b.name.toLowerCase().includes('head'));
+            if (headBone) {
+                headBoneRef.current = headBone;
+                logs.push(`[REF] Head -> ${headBone.name}`);
+
+                // ATTACH STATIC HAIR TO HEAD BONE
+                // ATTACH STATIC HAIR TO HEAD BONE
+                window.HAIR_MESHES.forEach(hairMesh => {
+                    // Force attach logic restored
+                    // We attach BOTH Mesh and SkinnedMesh because the skincare weights are broken for stationary hair
+                    try {
+                        headBone.attach(hairMesh);
+                        console.log(`Attached ${hairMesh.name} to HeadBone`);
+                        logs.push(`[FIX] Attached ${hairMesh.name} -> Head`);
+                    } catch (e) {
+                        console.warn("Attachment failed:", e);
+                    }
+                });
+            }
+
+            // FORCE HIDE BODY PARTS - OPT-IN STRATEGY (The "Nuclear" Option)
+            // Hide EVERYTHING by default, only reveal specifically allowed parts.
+            if (headMeshRef.current) {
+                scene.traverse((child) => {
+                    if (child.isMesh) {
+                        const name = child.name.toLowerCase();
+                        const matName = child.material?.name?.toLowerCase() || '';
+
+                        // ALLOWLIST: Only these parts are allowed to be visible
+                        const isHair = name.includes('hair') || matName.includes('hair') || name.includes('scalp') || name === 'object_34';
+                        const isHoodie = name.includes('hoodie') || matName.includes('cloth');
+
+                        // Fix: Check MATERIAL names too, because mesh names can be generic (e.g. Object_20)
+                        const isHead =
+                            name.includes('head') || matName.includes('head') ||
+                            name.includes('face') || matName.includes('face') ||
+                            name.includes('teeth') || matName.includes('teeth') ||
+                            name.includes('tongue') || matName.includes('tongue') ||
+                            name.includes('eye') || matName.includes('eye') ||
+                            name.includes('lash') || matName.includes('lash') ||
+                            name.includes('brow') || matName.includes('brow') ||
+                            name.includes('mouth') || matName.includes('mouth');
+
+                        const isDebug = name.includes('debug'); // Keep debug plane if needed?
+
+                        if (isHair || isHoodie || isHead) {
+                            // Allowed to exist
+                            return;
+                        }
+
+                        // BLOCKLIST: Hide everything else (Arms, Legs, Body, Accessories, etc.)
+                        // console.log(`[HIDE] Auto-Hidden: ${child.name} (Mat: ${matName})`);
+                        child.visible = false;
+                        child.scale.set(0, 0, 0);
+                        logs.push(`[HIDE] ${child.name}`);
+                    }
+                });
+            }
+
+
+
+            bones.forEach(bone => {
+                const name = bone.name.toLowerCase();
+
+                // Jaw (Lip Sync)
+                if (name.includes('jawroot') || (name.includes('jaw') && !name.includes('upper'))) {
+                    jawRef.current = bone;
+                    logs.push(`[REF] Jaw -> ${bone.name}`);
+                }
+                // ... (rest of mapping)
+                // Eyes
+                if (name.includes('l_eye') || (name.includes('left') && name.includes('eye'))) {
+                    leftEyeBoneRef.current = bone;
+                }
+                if (name.includes('r_eye') || (name.includes('right') && name.includes('eye'))) {
+                    rightEyeBoneRef.current = bone;
+                }
+                // Arms
+                if (name.includes('l_upperarm') && !name.includes('twist')) {
+                    leftUpperArmRef.current = bone;
+                }
+                if (name.includes('r_upperarm') && !name.includes('twist')) {
+                    rightUpperArmRef.current = bone;
+                }
+                if (name.includes('l_forearm') && !name.includes('twist')) {
+                    leftForeArmRef.current = bone;
+                }
+                if (name.includes('r_forearm') && !name.includes('twist')) {
+                    rightForeArmRef.current = bone;
+                }
+            });
+
+        } else {
+            console.warn("⚠️ Head/Skeleton not ready for bone mapping yet.");
+        }
+
+        setDebugLogs(prev => [...prev, ...logs]);
+
+        // Debug Global
         window.DEBUG_ARM_REFS = {
             lArm: leftUpperArmRef.current ? leftUpperArmRef.current.name : 'MISSING',
             rArm: rightUpperArmRef.current ? rightUpperArmRef.current.name : 'MISSING',
-            lFore: leftForeArmRef.current ? leftForeArmRef.current.name : 'MISSING',
-            rFore: rightForeArmRef.current ? rightForeArmRef.current.name : 'MISSING',
+            jaw: jawRef.current ? jawRef.current.name : 'MISSING'
         };
-    }, [scene, hoodieScene]);
+
+    }, [scene, hoodieScene, morphTargets]);
 
     // Expose logs to window for easy checking
     window.DEBUG_SCENE_MESHES = debugLogs;
 
     useFrame((state) => {
         const t = state.clock.elapsedTime;
+        let blinkIntensity = 0; // Moved here for scope visibility
 
-        // Apply Upper Arm (Shoulder) Rotation
-        if (leftUpperArmRef.current) {
-            leftUpperArmRef.current.rotation.x = shoulderX;
-            leftUpperArmRef.current.rotation.y = shoulderY;
-            leftUpperArmRef.current.rotation.z = (Math.PI / 3) + shoulderZ;
-        }
-        if (rightUpperArmRef.current) {
-            rightUpperArmRef.current.rotation.x = shoulderX;
-            rightUpperArmRef.current.rotation.y = -shoulderY; // Mirrored
-            rightUpperArmRef.current.rotation.z = -((Math.PI / 3) + shoulderZ);
+        // DEBUG: Check Bone Refs once
+        if (Math.random() < 0.01) {
+            // console.log("LeftArmRef:", leftUpperArmRef.current?.name); 
         }
 
-        // Apply Forearm (Elbow) Rotation
-        if (leftForeArmRef.current) {
-            leftForeArmRef.current.rotation.x = elbowX;
-            leftForeArmRef.current.rotation.y = elbowY;
-            leftForeArmRef.current.rotation.z = elbowZ;
-        }
-        if (rightForeArmRef.current) {
-            rightForeArmRef.current.rotation.x = elbowX;
-            rightForeArmRef.current.rotation.y = -elbowY; // Mirrored
-            rightForeArmRef.current.rotation.z = -elbowZ;
+        // --- BONE BASED ANIMATION MOVED TO BOTTOM ---
+        if (leftEyeBoneRef.current && rightEyeBoneRef.current) {
+            blinkTimer.current += 0.016;
+            const blinkDuration = 0.15; // Fast blink
+
+            let scaleY = 1.0;
+
+            if (blinkTimer.current >= nextBlinkInterval.current) {
+                const timeSinceTrigger = blinkTimer.current - nextBlinkInterval.current;
+                if (timeSinceTrigger < blinkDuration) {
+                    // Scaling down to 0.1 simulates closed eye
+                    const phase = timeSinceTrigger / blinkDuration;
+                    const intensity = Math.sin(phase * Math.PI); // 0 -> 1 -> 0
+                    scaleY = 1.0 - (intensity * 0.9); // Drop to 0.1
+                } else {
+                    // Reset
+                    blinkTimer.current = 0;
+                    nextBlinkInterval.current = 2 + Math.random() * 4;
+                }
+            }
+
+            leftEyeBoneRef.current.scale.y = scaleY;
+            rightEyeBoneRef.current.scale.y = scaleY;
         }
 
         if (headMeshRef.current && morphTargets) {
+            // Keep headMeshRef logic if needed for other things, but clear morph debugger
             const influences = headMeshRef.current.morphTargetInfluences;
-            const dict = morphTargets;
+            if (headMeshRef.current.morphTargetDictionary) {
+                console.log("MORPH NAMES LIST:", Object.keys(headMeshRef.current.morphTargetDictionary).join(", "));
+                // FORCE DEBUG: See the structure
+                console.log("MORPH DICT JSON:", JSON.stringify(headMeshRef.current.morphTargetDictionary).substring(0, 500)); // First 500 chars
+                console.log("HAS mouthOpen?", headMeshRef.current.morphTargetDictionary.hasOwnProperty('mouthOpen'));
+            }
+            const dict = headMeshRef.current.morphTargetDictionary; // Defined here to avoid ReferenceError
+            // ... (rest of logic removed)
+
+
 
             // --- Reset morphs slightly to avoid getting stuck ---
             // (Optional, depnds on implementation)
 
             // --- Blink Animation ---
             // Common names: blink, eyes_closed, blink_left, etc.
-            const blinkLeft = dict['Blink_Left'] ?? dict['blink_left'] ?? dict['eyeBlinkLeft'] ?? dict['eyes_closed'];
-            const blinkRight = dict['Blink_Right'] ?? dict['blink_right'] ?? dict['eyeBlinkRight'] ?? dict['eyes_closed'];
+            // Search case-insensitive if exact match fails
+            const findMorphIndex = (keys) => {
+                for (let key of keys) {
+                    if (dict[key] !== undefined) return dict[key];
+                    // Try lower case
+                    const lowerKey = Object.keys(dict).find(k => k.toLowerCase() === key.toLowerCase());
+                    if (lowerKey) return dict[lowerKey];
+                }
+                return undefined;
+            };
 
-            // Random blinking logic
-            if (Math.random() > 0.995) {
-                if (blinkLeft !== undefined) influences[blinkLeft] = 1;
-                if (blinkRight !== undefined) influences[blinkRight] = 1;
-            } else {
-                if (blinkLeft !== undefined) influences[blinkLeft] = THREE.MathUtils.lerp(influences[blinkLeft], 0, 0.1);
-                if (blinkRight !== undefined) influences[blinkRight] = THREE.MathUtils.lerp(influences[blinkRight], 0, 0.1);
+            const blinkLeftIndex = findMorphIndex(['Blink_Left', 'blink_left', 'eyeBlinkLeft', 'eyes_closed', 'close_eyes']);
+            const blinkRightIndex = findMorphIndex(['Blink_Right', 'blink_right', 'eyeBlinkRight', 'eyes_closed', 'close_eyes']);
+
+
+            // Timer Logic
+            blinkTimer.current += 0.016; // Approx delta time (could use state.clock.getDelta() but be careful with re-renders)
+
+
+
+            // Timer Logic
+            // blinkTimer incremented above already
+            const blinkDuration = 1; // Slower blink (0.5s)
+
+            if (blinkTimer.current >= nextBlinkInterval.current) {
+                // Time to blink!
+                // We are in the blink phase.
+                const timeSinceTrigger = blinkTimer.current - nextBlinkInterval.current;
+
+                if (timeSinceTrigger < blinkDuration) {
+                    // Calculate sine wave for smooth open/close (0 -> 1 -> 0)
+                    // Map time (0 to duration) to (0 to PI)
+                    const tMap = (timeSinceTrigger / blinkDuration) * Math.PI;
+                    blinkIntensity = Math.sin(tMap);
+                    // console.log("BLINKING NOW! Intensity:", blinkIntensity);
+                } else {
+                    // Blink finished
+                    blinkTimer.current = 0;
+                    nextBlinkInterval.current = 2 + Math.random() * 4; // Reset timer for next blink (2-6 seconds)
+                    // console.log("Blink Finished. Next in:", nextBlinkInterval.current);
+                }
             }
+
+            // Apply to morphs
+            if (blinkLeftIndex !== undefined) influences[blinkLeftIndex] = blinkIntensity;
+            if (blinkRightIndex !== undefined) influences[blinkRightIndex] = blinkIntensity;
 
             // --- Lip Sync ---
             if (isSpeaking) {
@@ -471,6 +625,140 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
                 if (jawOpen !== undefined) influences[jawOpen] = THREE.MathUtils.lerp(influences[jawOpen], 0, 0.15);
             }
         }
+
+        // --- BONE ANIMATION (Added for Jaw/Eyes/Arms) ---
+        if (jawRef.current) {
+            if (isSpeaking || testSpeak) {
+                // Dynamic Jaw Movement (Advanced Syllable Simulation)
+                // Combine varying frequencies to create "syllables" and pauses
+                const t = state.clock.elapsedTime;
+
+                // Base rhythm (syllables) + Fast jitter (articulation) + Slow wave (phrasing)
+                const s1 = Math.sin(t * 15);      // Main talk speed
+                const s2 = Math.sin(t * 37) * 0.4; // Fast articulation jitter
+                const s3 = Math.sin(t * 4) * 0.3;  // Phrasing flow (loud/soft parts)
+
+                // Combine and normalize to 0..1 range (approx)
+                let wave = (s1 + s2 + s3 + 1.5) / 3.5;
+                wave = Math.max(0, Math.min(1, wave)); // Clamp
+
+                // Scale intensity
+                const intensity = 0.18; // Max opening
+                const movement = wave * intensity;
+
+                if (debugJaw) {
+                    // Manual Calibration Mode
+                    jawRef.current.rotation.x = 0;
+                    jawRef.current.rotation.y = 0;
+                    jawRef.current.rotation.z = 0;
+                    jawRef.current.rotation[jawAxis] = jawValue;
+                } else {
+                    // Auto Animation Mode
+                    // Standard CC Characters use X for Jaw Pitch (Open/Close)
+                    // Y is usually Yaw (Side-to-side), Z is Roll.
+                    // Switched to X based on standard rigging.
+                    jawRef.current.rotation.x = THREE.MathUtils.lerp(jawRef.current.rotation.x, movement, 0.3);
+                }
+
+
+                // --- VISEME CYCLING ("Ah" vs "O") ---
+                // User wants "Up and Down" (Ah) AND "O" shape
+                // Cycle every 2 seconds to show variety
+                const shapeCycle = Math.sin(state.clock.elapsedTime * 3); // -1 to 1
+                const isO_Shape = shapeCycle > 0.2; // 40% of time "O", 60% "Ah"
+
+                // "O" SHAPE: Narrow jaw when loud (Scale X < 1)
+                // "Ah" SHAPE: Normal jaw width (Scale X = 1)
+                const targetScaleX = (isO_Shape && movement > 0.08) ? 0.70 : 1.0;
+
+                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, targetScaleX, 0.2);
+
+                // --- MICRO-HEAD MOVEMENTS (Realism) ---
+                // --- MICRO-HEAD MOVEMENTS (MOVED OUTSIDE) ---
+
+
+                // --- MORPH SCANNER (Inactive) ---
+                // ...
+            } else {
+                jawRef.current.rotation.y = THREE.MathUtils.lerp(jawRef.current.rotation.y, 0, 0.2);
+                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, 1, 0.2);
+
+                // Return to neutral
+                // Return to neutral
+                // Head movement logic is now global (outside this block)
+
+            }
+        }
+
+        // --- GLOBAL HEAD MOVEMENT (Idle + Face Tracking) ---
+        if (headBoneRef.current) {
+            const t = state.clock.elapsedTime;
+
+            // Idle Wobble
+            const wobbleX = Math.sin(t * 1.2) * 0.03;
+            const wobbleZ = Math.cos(t * 0.8) * 0.02;
+
+            // Face Tracking (Head turns slightly towards user)
+            // facePosition.x is -1 (left) to 1 (right) inverted? 
+            // Usually if user is on left of screen, they are on my right? 
+            // Let's assume standard webcam mirror: moving head left = x negative.
+            const trackX = (facePosition.x || 0) * 0.3; // Limit head turn
+            const trackY = (facePosition.y || 0) * 0.2; // Limit head tilt
+
+            // Combine Idle + Tracking
+            const targetX = wobbleX + (-trackY); // Look up/down (Y input affects X rotation)
+            const targetY = (-trackX);           // Look left/right (X input affects Y rotation)
+
+            headBoneRef.current.rotation.x = THREE.MathUtils.lerp(headBoneRef.current.rotation.x, targetX, 0.1);
+            headBoneRef.current.rotation.y = THREE.MathUtils.lerp(headBoneRef.current.rotation.y, targetY, 0.1);
+            headBoneRef.current.rotation.z = THREE.MathUtils.lerp(headBoneRef.current.rotation.z, wobbleZ, 0.1);
+        }
+
+        // --- EYE TRACKING ---
+        if (leftEyeBoneRef.current && rightEyeBoneRef.current) {
+            const scaleY = 1.0 - blinkIntensity;
+            leftEyeBoneRef.current.scale.set(1, scaleY, 1);
+            rightEyeBoneRef.current.scale.set(1, scaleY, 1);
+
+            // Eye Gaze
+            const eyeX = (facePosition.x || 0) * 0.5; // Eyes move more than head
+            const eyeY = (facePosition.y || 0) * 0.5;
+
+            // X input -> Y rotation (Yaw)
+            // Y input -> X rotation (Pitch)
+            // Invert as needed based on coordinate system
+            const targetEyeRotY = -eyeX;
+            const targetEyeRotX = -eyeY;
+
+            leftEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.y, targetEyeRotY, 0.2);
+            leftEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(leftEyeBoneRef.current.rotation.x, targetEyeRotX, 0.2);
+
+            rightEyeBoneRef.current.rotation.y = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.y, targetEyeRotY, 0.2);
+            rightEyeBoneRef.current.rotation.x = THREE.MathUtils.lerp(rightEyeBoneRef.current.rotation.x, targetEyeRotX, 0.2);
+        }
+
+
+        if (leftUpperArmRef.current) leftUpperArmRef.current.scale.set(0, 0, 0);
+        if (leftForeArmRef.current) leftForeArmRef.current.scale.set(0, 0, 0);
+        if (rightUpperArmRef.current) rightUpperArmRef.current.scale.set(0, 0, 0);
+        if (rightForeArmRef.current) rightForeArmRef.current.scale.set(0, 0, 0);
+
+        // Fix Hair Alignment (Snap to Head Position/Rotation if drifting)
+        // Heuristic: If we have a dedicated hair bone or mesh, ensure it follows head
+        // Hair alignment is now handled in useEffect (bone attachment)
+
+
+        if (leftUpperArmRef.current) {
+            leftUpperArmRef.current.rotation.x = THREE.MathUtils.degToRad(shoulderX);
+            leftUpperArmRef.current.rotation.y = THREE.MathUtils.degToRad(shoulderY);
+            leftUpperArmRef.current.rotation.z = THREE.MathUtils.degToRad(shoulderZ);
+        }
+        if (leftForeArmRef.current) {
+            leftForeArmRef.current.rotation.x = THREE.MathUtils.degToRad(elbowX);
+            leftForeArmRef.current.rotation.y = THREE.MathUtils.degToRad(elbowY);
+            leftForeArmRef.current.rotation.z = THREE.MathUtils.degToRad(elbowZ);
+        }
+
     });
 
     return (
@@ -485,13 +773,13 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
             <HoodieModel scene={hoodieScene} />
 
             {/* DEBUG OVERLAY */}
-            {/* DEBUG OVERLAY */}
             {showDebugPanel && (
-                <Html position={[0, 0, 0]}>
+                <Html position={[0, 1.5, 0]} style={{ pointerEvents: 'none' }} zIndexRange={[100, 0]} eps={0.1}>
                     <div style={{
                         position: 'absolute',
-                        top: '10px',
-                        left: '10px',
+                        width: '300px',
+                        top: '-100px',
+                        left: '100px',
                         background: 'rgba(0,0,0,0.8)',
                         color: '#0f0',
                         padding: '10px',
@@ -503,6 +791,7 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo }) {
                         fontFamily: 'monospace'
                     }}>
                         <h3>Debug Meshes</h3>
+                        <h1 style={{ color: 'yellow', fontSize: '24px' }}>Morph: {debugMorphIndex}</h1>
                         {debugLogs.map((log, i) => (
                             <div key={i}>{log}</div>
                         ))}
