@@ -33,17 +33,13 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
         morphableMeshesRef.current = [];
     });
 
-    const {
-        shoulderX, shoulderY, shoulderZ,
-        elbowX, elbowY, elbowZ
-    } = useControls('Body Pose', {
-        shoulderX: { value: 0.8, min: -1.5, max: 1.5, step: 0.1, label: 'Shoulder Forward/Back' },
-        shoulderY: { value: -0.2, min: -1.5, max: 1.5, step: 0.1, label: 'Shoulder Twist' },
-        shoulderZ: { value: -1.0, min: -1.5, max: 1.5, step: 0.1, label: 'Shoulder Up/Down' },
-        elbowX: { value: 0.4, min: -1.5, max: 2.5, step: 0.1, label: 'Elbow Bend' },
-        elbowY: { value: 0, min: -1.5, max: 1.5, step: 0.1, label: 'Elbow Twist' },
-        elbowZ: { value: -0.6, min: -1.5, max: 1.5, step: 0.1, label: 'Elbow Side' },
-    });
+    // Body Pose Constants (Controls hidden)
+    const shoulderX = 0.8;
+    const shoulderY = -0.2;
+    const shoulderZ = -1.0;
+    const elbowX = 0.4;
+    const elbowY = 0;
+    const elbowZ = -0.6;
 
     // Jaw Calibration
     const { debugJaw, jawAxis, jawValue } = useControls('Jaw Calibration', {
@@ -71,11 +67,11 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
     });
 
     const { hairColor1, hairColor2, hairGradientAngle, hairGradientPos, hairGradientSharpness } = useControls('Hair Gradient', {
-        hairColor1: { value: '#39274c', label: 'Main Color' },
-        hairColor2: { value: '#2d4949', label: 'Highlight Color' }, // Cyan/Teal as requested
+        hairColor1: { value: '#dd0a0a', label: 'Main Color' },
+        hairColor2: { value: '#0f0f0f', label: 'Highlight Color' },
         hairGradientAngle: { value: 196, min: 0, max: 360, step: 1, label: 'Angle' },
-        hairGradientPos: { value: 2, min: -1, max: 2, step: 0.01, label: 'Position' },
-        hairGradientSharpness: { value: 5, min: 0.01, max: 5.0, step: 0.01, label: 'Sharpness' }
+        hairGradientPos: { value: 0.88, min: -1, max: 2, step: 0.01, label: 'Position' },
+        hairGradientSharpness: { value: 0.07, min: 0.01, max: 5.0, step: 0.01, label: 'Sharpness' }
     });
 
     const { debugMorphIndex, debugMorphValue, resetMorphs, testSpeak } = useControls('Morph Debugger', {
@@ -97,14 +93,17 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                 color2: { value: new THREE.Color(hairColor2) },
                 angle: { value: hairGradientAngle },
                 splitPos: { value: hairGradientPos },
-                sharpness: { value: hairGradientSharpness }
+                sharpness: { value: hairGradientSharpness },
+                lightDirection: { value: new THREE.Vector3(0.5, 1.0, 0.5) } // Standard lighting
             },
             vertexShader: `
                 varying vec2 vUv;
                 varying vec3 vPos;
+                varying vec3 vNormal;
                 void main() {
                     vUv = uv;
                     vPos = position; // Object space position
+                    vNormal = normalize(normalMatrix * normal);
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
@@ -114,8 +113,11 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                 uniform float angle;
                 uniform float splitPos;
                 uniform float sharpness;
+                uniform vec3 lightDirection;
+                
                 varying vec2 vUv;
                 varying vec3 vPos;
+                varying vec3 vNormal;
 
                 void main() {
                     // Rotate position for gradient
@@ -128,7 +130,24 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                     // Adjust range
                     float mixVal = smoothstep(splitPos - (0.5/sharpness), splitPos + (0.5/sharpness), t);
                     
-                    vec3 finalColor = mix(color1, color2, mixVal);
+                    vec3 baseColor = mix(color1, color2, mixVal);
+
+                    // Simple lighting
+                    vec3 norm = normalize(vNormal);
+                    vec3 viewDir = normalize(-vPos); // Approximate view direction
+                    vec3 lightDir = normalize(lightDirection);
+
+                    // Diffuse
+                    float diffuse = max(dot(norm, lightDir), 0.0);
+                    
+                    // Specular (Glossy)
+                    vec3 reflectDir = reflect(-lightDir, norm);
+                    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32.0);
+
+                    // Combine
+                    vec3 ambient = vec3(0.3);
+                    vec3 finalColor = baseColor * (ambient + vec3(diffuse)*0.8) + vec3(spec)*0.3;
+
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
             `
@@ -393,53 +412,8 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
 
                     // Make hair material brighter and more receptive to light
                     if (c.material) {
-                        console.log('=== HAIR DEBUG: Applying position-based split to:', c.name, 'Material:', c.material.type);
-
-                        // Use ShaderMaterial for position-based coloring
-                        c.material = new THREE.ShaderMaterial({
-                            uniforms: {
-                                lightDirection: { value: new THREE.Vector3(0, 1, 0) },
-                                ambientColor: { value: new THREE.Color(0x404040) },
-                                cyanColor: { value: new THREE.Color(0x00D4FF) },  // Bright cyan
-                                redColor: { value: new THREE.Color(0xCC0000) }     // Deep red
-                            },
-                            vertexShader: `
-                                varying vec3 vNormal;
-                                varying vec3 vPosition;
-                                
-                                void main() {
-                                    vNormal = normalize(normalMatrix * normal);
-                                    vPosition = position;
-                                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                                }
-                            `,
-                            fragmentShader: `
-                                uniform vec3 lightDirection;
-                                uniform vec3 ambientColor;
-                                uniform vec3 cyanColor;
-                                uniform vec3 redColor;
-                                
-                                varying vec3 vNormal;
-                                varying vec3 vPosition;
-                                
-                                void main() {
-                                    // Split based on X position (left = cyan, right = red)
-                                    float splitPosition = vPosition.x;
-                                    float mixFactor = smoothstep(-0.02, 0.02, splitPosition);
-                                    vec3 baseColor = mix(cyanColor, redColor, mixFactor);
-                                    
-                                    // Simple lighting
-                                    float diffuse = max(dot(vNormal, lightDirection), 0.0);
-                                    vec3 lighting = ambientColor + vec3(diffuse * 0.8);
-                                    
-                                    // Add glossy shine
-                                    vec3 finalColor = baseColor * lighting * 1.5;
-                                    
-                                    gl_FragColor = vec4(finalColor, 1.0);
-                                }
-                            `,
-                            side: THREE.DoubleSide
-                        });
+                        // Removed hardcoded shader override to allow Leva controls to work
+                        // The 'hairMaterial' applied in the first pass is now sufficient
                     }
                 }
             }
@@ -874,12 +848,10 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
 }
 
 function HoodieModel({ scene }) {
-    // Leva controls for positioning
-    const { position, rotation, scale } = useControls('Hoodie', {
-        position: { value: [0, 0.28, 0], step: 0.05 },
-        rotation: { value: [0, 0, 0], step: 0.1 },
-        scale: { value: [1.5, 1.5, 1.5], step: 0.1 }
-    });
+    // Hoodie Transform Constants (Controls hidden)
+    const position = [0, 0.28, 0];
+    const rotation = [0, 0, 0];
+    const scale = [1.5, 1.5, 1.5];
 
     return <primitive object={scene} position={position} rotation={rotation} scale={scale} />;
 }
