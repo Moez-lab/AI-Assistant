@@ -29,6 +29,123 @@ This project runs on a **parallel multi-threaded architecture** with two main co
 
 ![Feature Map](assets/feature_map.png)
 
+### TL;DR - Quick Start (Copy & Paste)
+```bash
+# Backend Setup
+conda create -n jarvis python=3.10 -y && conda activate jarvis
+conda install -c conda-forge h5py=3.11.0 -y
+pip install deepface==0.0.79 opencv-python==4.8.1.78 ultralytics edge-tts pygame SpeechRecognition PyAudio websockets selenium requests psutil pyautogui pandas numpy Pillow gdown tqdm retina-face mtcnn tensorflow==2.13.0 keras==2.13.1 tensorflow-io-gcs-filesystem==0.31.0
+
+# Frontend Setup (in new terminal)
+cd web_interface && npm install && npm run dev
+
+# Start Backend (in first terminal)
+python setup.py
+```
+*Open browser to http://localhost:5173 and press 's' in camera window to save your face!*
+
+---
+
+## ⚙️ Environment Setup
+
+### Prerequisites
+- **Python**: 3.10 or 3.11 (recommended)
+- **Node.js**: 16+ (for frontend)
+- **Conda**: Anaconda or Miniconda (recommended for Python environment)
+- **Webcam**: Required for face recognition and tracking
+
+### Option 1: Quick Setup (Conda - Recommended)
+
+#### Step 1: Create and activate conda environment
+```bash
+# Create conda environment with Python 3.10
+conda create -n jarvis python=3.10 -y
+conda activate jarvis
+```
+
+#### Step 2: Install Python dependencies (One command!)
+```bash
+# Install h5py from conda-forge first (critical for Windows)
+conda install -c conda-forge h5py=3.11.0 -y
+
+# Install all Python packages
+pip install deepface==0.0.79 opencv-python==4.8.1.78 ultralytics edge-tts pygame SpeechRecognition PyAudio websockets selenium requests psutil pyautogui pandas numpy Pillow gdown tqdm retina-face mtcnn tensorflow==2.13.0 keras==2.13.1 tensorflow-io-gcs-filesystem==0.31.0
+```
+
+**Or use the requirements.txt:**
+```bash
+pip install -r requirements.txt
+```
+
+#### Step 3: Install Node.js dependencies for frontend
+```bash
+cd web_interface
+npm install
+cd ..
+```
+
+### Option 2: Automated Setup (Windows Only)
+
+Run the provided batch script:
+```bash
+# First create conda environment named 'ass' or modify script
+conda create -n ass python=3.10 -y
+conda activate ass
+
+# Then run the installer
+install_dependencies.bat
+```
+
+### Option 3: Manual Setup (Without Conda)
+
+#### Python (using venv)
+```bash
+# Create virtual environment
+python -m venv jarvis_env
+
+# Activate (Windows)
+jarvis_env\Scripts\activate
+
+# Activate (Linux/Mac)
+source jarvis_env/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+#### Node.js
+```bash
+cd web_interface
+npm install
+cd ..
+```
+
+### Troubleshooting Installation
+
+#### PyAudio Installation Fails (Windows)?
+```bash
+# Download precompiled wheel from:
+# https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+# Then install:
+pip install PyAudio-0.2.11-cp310-cp310-win_amd64.whl
+```
+
+#### TensorFlow/DeepFace Issues?
+```bash
+# Use exact versions for compatibility
+pip uninstall tensorflow keras deepface -y
+pip install tensorflow==2.13.0 keras==2.13.1 --no-deps
+pip install deepface --no-deps
+pip install pandas gdown requests tqdm Pillow numpy retina-face mtcnn
+```
+
+#### Missing YOLO Model?
+The `yolov8n.pt` model will download automatically on first run. If it fails:
+```bash
+# Download manually
+wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8n.pt
+```
+
 ---
 
 ## 🚀 How to Start

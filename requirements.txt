@@ -1,0 +1,37 @@
+# ===================================
+# JARVIS AI Assistant - Python Dependencies
+# ===================================
+
+# Core AI & Vision
+deepface==0.0.79
+opencv-python==4.8.1.78
+ultralytics>=8.0.0
+tensorflow==2.13.0
+keras==2.13.1
+tensorflow-io-gcs-filesystem==0.31.0
+
+# Audio & Voice
+edge-tts>=6.1.0
+pygame>=2.0.0
+SpeechRecognition>=3.10.0
+PyAudio>=0.2.11
+noisereduce>=2.0.0  # Optional: for noise cancellation
+
+# Web & Automation
+websockets>=11.0.0
+selenium>=4.0.0
+requests>=2.28.0
+
+# System & Utilities
+psutil>=5.9.0
+pyautogui>=0.9.53
+pandas>=1.5.0
+numpy>=1.23.0
+Pillow>=9.0.0
+gdown>=4.6.0
+tqdm>=4.65.0
+h5py==3.11.0
+
+# Additional DeepFace dependencies
+retina-face>=0.0.13
+mtcnn>=0.1.1
