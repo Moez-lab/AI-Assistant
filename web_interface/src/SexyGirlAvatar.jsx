@@ -22,6 +22,8 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
     const rightEyeBoneRef = useRef();
     const headBoneRef = useRef();
     const eyeBaseRotation = useRef({ left: new THREE.Euler(), right: new THREE.Euler() });
+    const jawBaseQuaternion = useRef(new THREE.Quaternion()); // Store initial jaw rotation as quaternion
+    const jawTargetQuaternion = useRef(new THREE.Quaternion()); // Target rotation for smooth interpolation
 
 
     // Blink State
@@ -45,7 +47,7 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
     const { debugJaw, jawAxis, jawValue } = useControls('Jaw Calibration', {
         debugJaw: { value: false, label: 'Enable Manual Jaw' },
         jawAxis: { options: ['x', 'y', 'z'], value: 'x', label: 'Rotation Axis' },
-        jawValue: { value: 0, min: -1, max: 1, step: 0.01, label: 'Rotation Value' }
+        jawValue: { value: 0, min: -1, max: 1.65, step: 0.01, label: 'Rotation Value' }
     });
 
 
@@ -502,6 +504,7 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
                 // Jaw (Lip Sync)
                 if (name.includes('jawroot') || (name.includes('jaw') && !name.includes('upper'))) {
                     jawRef.current = bone;
+                    jawBaseQuaternion.current.copy(bone.quaternion); // Store initial rotation as quaternion
                     logs.push(`[REF] Jaw -> ${bone.name}`);
                 }
                 // ... (rest of mapping)
@@ -669,74 +672,89 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
         // --- BONE ANIMATION (Added for Jaw/Eyes/Arms) ---
         if (jawRef.current) {
             if (isSpeaking || testSpeak) {
-                // Dynamic Jaw Movement (Advanced Syllable Simulation)
-                // Combine varying frequencies to create "syllables" and pauses
+                // Enhanced Dynamic Jaw Movement with Natural Lip Sync
                 const t = state.clock.elapsedTime;
 
-                // Base rhythm (syllables) + Fast jitter (articulation) + Slow wave (phrasing)
-                const s1 = Math.sin(t * 15);      // Main talk speed
-                const s2 = Math.sin(t * 37) * 0.4; // Fast articulation jitter
-                const s3 = Math.sin(t * 4) * 0.3;  // Phrasing flow (loud/soft parts)
+                // Create realistic speech patterns with multiple frequencies
+                const s1 = Math.sin(t * 12);      // Main syllable rhythm (slower)
+                const s2 = Math.sin(t * 28) * 0.3; // Fast micro-movements
+                const s3 = Math.sin(t * 5) * 0.4;  // Slow breathing/phrasing pattern
+                const s4 = Math.cos(t * 18) * 0.2; // Additional variation
 
-                // Combine and normalize to 0..1 range (approx)
-                let wave = (s1 + s2 + s3 + 1.5) / 3.5;
-                wave = Math.max(0, Math.min(1, wave)); // Clamp
+                // Combine and normalize to 0..1 range
+                let wave = (s1 + s2 + s3 + s4 + 2) / 4;
+                wave = Math.max(0, Math.min(1, wave)); // Clamp to 0-1
 
-                // Scale intensity
-                const intensity = 0.18; // Max opening
-                const movement = wave * intensity;
+                // More subtle intensity for natural movement
+                const intensity = 0.15; // Reduced from 0.18
+                const movementX = wave * intensity; // Primary jaw opening (down)
+
+                // Add horizontal movement for more natural lip sync
+                const movementY = Math.sin(t * 22) * 0.03; // Subtle side-to-side
 
                 if (debugJaw) {
                     // Manual Calibration Mode
                     jawRef.current.rotation.x = 0;
                     jawRef.current.rotation.y = 0;
-                    jawRef.current.rotation.z = 0;
+                    jawRef.current.rotation.z = 1.65;
                     jawRef.current.rotation[jawAxis] = jawValue;
                 } else {
-                    // Auto Animation Mode
-                    // Standard CC Characters use X for Jaw Pitch (Open/Close)
-                    // Y is usually Yaw (Side-to-side), Z is Roll.
-                    // Switched to X based on standard rigging.
-                    jawRef.current.rotation.x = THREE.MathUtils.lerp(jawRef.current.rotation.x, movement, 0.3);
+                    // Enhanced Animation Mode with multi-axis movement
+                    // X-axis: Primary jaw opening (up/down)
+                    const jawRotationX = new THREE.Quaternion();
+                    const localXAxis = new THREE.Vector3(1, 0, 0);
+                    jawRotationX.setFromAxisAngle(localXAxis, movementX);
+
+                    // Y-axis: Subtle horizontal movement (side-to-side)
+                    const jawRotationY = new THREE.Quaternion();
+                    const localYAxis = new THREE.Vector3(0, 1, 0);
+                    jawRotationY.setFromAxisAngle(localYAxis, movementY);
+
+                    // Combine all rotations: base -> X rotation -> Y rotation
+                    jawTargetQuaternion.current
+                        .copy(jawBaseQuaternion.current)
+                        .multiply(jawRotationX)
+                        .multiply(jawRotationY);
+
+                    // Smoother interpolation for more fluid movement
+                    jawRef.current.quaternion.slerp(jawTargetQuaternion.current, 0.25);
                 }
 
+                // --- ENHANCED VISEME CYCLING ---
+                // Alternate between "Ah" (wide) and "O" (narrow) shapes
+                const shapeCycle = Math.sin(t * 2.5); // Slightly slower cycle
+                const isO_Shape = shapeCycle > 0.3;
 
-                // --- VISEME CYCLING ("Ah" vs "O") ---
-                // User wants "Up and Down" (Ah) AND "O" shape
-                // Cycle every 2 seconds to show variety
-                const shapeCycle = Math.sin(state.clock.elapsedTime * 3); // -1 to 1
-                const isO_Shape = shapeCycle > 0.2; // 40% of time "O", 60% "Ah"
+                // "O" SHAPE: Narrow jaw horizontally
+                // "Ah" SHAPE: Wide jaw (normal width)
+                const targetScaleX = (isO_Shape && wave > 0.3) ? 0.75 : 1.0;
 
-                // "O" SHAPE: Narrow jaw when loud (Scale X < 1)
-                // "Ah" SHAPE: Normal jaw width (Scale X = 1)
-                const targetScaleX = (isO_Shape && movement > 0.08) ? 0.70 : 1.0;
+                // Smooth transition between shapes
+                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, targetScaleX, 0.15);
 
-                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, targetScaleX, 0.2);
-
-                // --- MICRO-HEAD MOVEMENTS (Realism) ---
-                // --- MICRO-HEAD MOVEMENTS (MOVED OUTSIDE) ---
-
-
-                // --- MORPH SCANNER (Inactive) ---
-                // ...
             } else {
-                jawRef.current.rotation.y = THREE.MathUtils.lerp(jawRef.current.rotation.y, 0, 0.2);
-                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, 1, 0.2);
-
-                // Return to neutral
-                // Return to neutral
-                // Head movement logic is now global (outside this block)
-
+                // Return to neutral position smoothly
+                jawRef.current.quaternion.slerp(jawBaseQuaternion.current, 0.15);
+                jawRef.current.scale.x = THREE.MathUtils.lerp(jawRef.current.scale.x, 1, 0.15);
             }
         }
 
-        // --- GLOBAL HEAD MOVEMENT (Idle + Face Tracking) ---
+        // --- GLOBAL HEAD MOVEMENT (Idle + Face Tracking + Speech Motion) ---
         if (headBoneRef.current) {
             const t = state.clock.elapsedTime;
 
-            // Idle Wobble
+            // Idle Wobble (gentle breathing motion)
             const wobbleX = Math.sin(t * 1.2) * 0.03;
             const wobbleZ = Math.cos(t * 0.8) * 0.02;
+
+            // Speech-Induced Micro-Movements (when speaking)
+            let speechBobX = 0;
+            let speechBobY = 0;
+            if (isSpeaking || testSpeak) {
+                // Subtle head bob synchronized with speech rhythm
+                speechBobX = Math.sin(t * 11) * 0.025;  // Slight nod
+                speechBobY = Math.cos(t * 13) * 0.015;  // Slight turn
+            }
 
             // Face Tracking (Head turns slightly towards user)
             // facePosition.x is -1 (left) to 1 (right) inverted? 
@@ -745,9 +763,9 @@ export default function SexyGirlAvatar({ isSpeaking, setDebugInfo, facePosition 
             const trackX = (facePosition.x || 0) * 0.3; // Limit head turn
             const trackY = (facePosition.y || 0) * 0.2; // Limit head tilt
 
-            // Combine Idle + Tracking
-            const targetX = wobbleX + (-trackY); // Look up/down (Y input affects X rotation)
-            const targetY = (-trackX);           // Look left/right (X input affects Y rotation)
+            // Combine Idle + Tracking + Speech Motion
+            const targetX = wobbleX + (-trackY) + speechBobX; // Look up/down + speech nod
+            const targetY = (-trackX) + speechBobY;           // Look left/right + speech turn
 
             headBoneRef.current.rotation.x = THREE.MathUtils.lerp(headBoneRef.current.rotation.x, targetX, 0.1);
             headBoneRef.current.rotation.y = THREE.MathUtils.lerp(headBoneRef.current.rotation.y, targetY, 0.1);
