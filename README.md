@@ -44,10 +44,6 @@ cd web_interface && npm install && npm run dev
 
 # Start Backend (in first terminal)
 python setup.py
-```
-*Open browser to http://localhost:5173 and press 's' in camera window to save your face!*
-
----
 
 ## ⚙️ Environment Setup
 
