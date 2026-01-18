@@ -458,6 +458,6 @@ For full license details, see the [LICENSE](LICENSE) file.
 
 ---
 
-**Built with ❤️ using Python, React, Three.js, and cutting-edge AI models.**
+**Built with using Python, React, Three.js, and cutting-edge AI models.**
 
 **© 2026 Mueez - JARVIS AI Assistant Project**
