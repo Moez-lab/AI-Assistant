@@ -167,7 +167,6 @@ cd web_interface
 npm install  # First time only
 npm run dev
 ```
-*This activates the 3D Avatar interface at `http://localhost:5173`.*
 
 ### 3. First-Time Setup
 - When the camera window opens, press **'s'** to save your face to the database
