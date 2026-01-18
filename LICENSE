@@ -1,0 +1,49 @@
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2026 Mueez - JARVIS AI Assistant Project
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+---
+
+ADDITIONAL TERMS:
+
+1. ATTRIBUTION REQUIREMENT:
+   Any use, modification, or distribution of this software MUST include
+   prominent attribution to the original author (Mueez) and a link to
+   the original repository.
+
+2. FORK REQUIREMENT FOR MODIFICATIONS:
+   If you wish to modify this software and distribute your modifications,
+   you MUST:
+   - Fork the original repository on GitHub
+   - Clearly indicate what changes you made
+   - Maintain this license in all derivative works
+   - Make your modified source code publicly available
+
+3. NO PLAGIARISM:
+   You may NOT claim this work as your own. All derivative works must
+   clearly state that they are based on the JARVIS AI Assistant by Mueez.
+
+4. SHARE-ALIKE:
+   Any modifications or derivative works MUST be released under the same
+   GPL v3 license or a compatible copyleft license.
+
+---
+
+For the full GPL v3 license text, visit:
+https://www.gnu.org/licenses/gpl-3.0.en.html
+
+Contact: [Your GitHub: https://github.com/YOUR_USERNAME]
