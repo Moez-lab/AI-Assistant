@@ -2,6 +2,9 @@
 
 **Advanced Hybrid AI Assistant** featuring a realistic 3D avatar interface powered by React and Three.js, combined with a Python AI backend for computer vision, voice synthesis, and desktop automation.
 
+![Jarvis Interface](assets/jarvis_interface.png)
+*Jarvis 3D Avatar Interface with real-time HUD overlay and customizable appearance*
+
 ## 🧠 System Architecture
 
 This project runs on a **parallel multi-threaded architecture** with two main components:
@@ -174,6 +177,8 @@ npm run dev
 ---
 
 ## 🎨 3D Avatar Features
+
+> **See it in action:** Check the [interface screenshot](#jarvis-ai-assistant-with-3d-avatar-interface) at the top!
 
 ### Real-Time Lip Sync
 - **Bone-based jaw animation** synchronized with voice output
