@@ -183,9 +183,6 @@ npm run dev
 
 ### Face Tracking
 - **Head rotation** follows your webcam position
-- **Eye contact** maintains engagement
-- **Automatic blinking** with realistic timing (2-6 second intervals)
-- **Idle animations** with gentle breathing motion
 
 ### Advanced Customization (Leva Controls)
 - **Hair Gradient System**: Dual-color gradient with adjustable angle, position, and sharpness
@@ -195,7 +192,7 @@ npm run dev
 
 ### Visual Enhancements
 - **Custom shader materials** for hair with realistic lighting
-- **Texture mapping** for skin, eyes, teeth, clothing
+- **Texture mapping** for skin, hair, clothing
 - **Environment lighting** with multiple spot/point lights
 - **Cyberpunk aesthetic** with bloom and vignette effects
 
